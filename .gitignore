@@ -1,0 +1,7 @@
+result
+result-*
+*.iso
+tests/out/
+__pycache__/
+*.pyc
+.direnv/

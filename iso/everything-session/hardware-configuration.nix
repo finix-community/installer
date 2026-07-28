@@ -1,0 +1,27 @@
+{ config, lib, pkgs, modulesPath, ... }:
+
+{
+
+  boot.initrd.availableKernelModules = [ "ahci" "xhci_pci" "usb_storage" "sd_mod" ];
+  boot.initrd.kernelModules = [ ];
+  boot.kernelModules = [ ];
+  boot.extraModulePackages = [ ];
+
+  fileSystems."/" =
+    { device = "/dev/sda2";
+      fsType = "ext4";
+    };
+
+  fileSystems."/boot" =
+    { device = "/dev/sda1";
+      fsType = "vfat";
+      options = [ "fmask=0077" "dmask=0077" ];
+    };
+
+  swapDevices = [ ];
+
+  hardware.firmware = [
+    pkgs.linux-firmware
+    pkgs.sof-firmware
+  ];
+}

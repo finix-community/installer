@@ -1,0 +1,176 @@
+{
+  "nodes": {
+    "finix": {
+      "locked": {
+        "lastModified": 1785015387,
+        "narHash": "sha256-MSrD5bsN14/TdLXkjojxLvm2OLUwqLEQjqGYfZta6EQ=",
+        "owner": "finix-community",
+        "repo": "finix",
+        "rev": "8a9b75a16b6f399e12d031dcd714a938af40c9b5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "finix-community",
+        "repo": "finix",
+        "rev": "8a9b75a16b6f399e12d031dcd714a938af40c9b5",
+        "type": "github"
+      }
+    },
+    "flake-utils": {
+      "locked": {
+        "lastModified": 1659877975,
+        "narHash": "sha256-zllb8aq3YO3h8B/U0/J1WBgAL8EX5yWf5pMj3G0NAmc=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "c0e246b9b83f637f4681389ecabcb2681b4f3af0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "newm-flake": {
+      "inputs": {
+        "flake-utils": "flake-utils",
+        "nixpkgs": "nixpkgs",
+        "pywmpkg": "pywmpkg"
+      },
+      "locked": {
+        "lastModified": 1685789897,
+        "narHash": "sha256-/3gOVWmP937+kTOTzHyUwpNR+zbSRKGGYOT3xKINg58=",
+        "owner": "jbuchermn",
+        "repo": "newm",
+        "rev": "d120fcc390eba70593aecfafbafefe8647fd5c92",
+        "type": "github"
+      },
+      "original": {
+        "owner": "jbuchermn",
+        "repo": "newm",
+        "rev": "d120fcc390eba70593aecfafbafefe8647fd5c92",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1665643254,
+        "narHash": "sha256-IBVWNJxGCsshwh62eRfR6+ry3bSXmulB3VQRzLQo3hk=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "ba187fbdc5e35322c7dff556ef2c47bddfd6e8d7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1784796856,
+        "narHash": "sha256-wWFrV5/Qbm+lyt5x20E/bSbfJiGKMo4RCxZV8cl/WZI=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "e2587caef70cea85dd97d7daab492899902dbf5d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "noctalia-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1785005717,
+        "narHash": "sha256-iq/Eqx62P/JJDpW7CgEsMWWPwOexIWRKXtqKF/drawA=",
+        "owner": "noctalia-dev",
+        "repo": "noctalia-shell",
+        "rev": "3d7b9869950592ff7cf3704f6a53afb169d850db",
+        "type": "github"
+      },
+      "original": {
+        "owner": "noctalia-dev",
+        "repo": "noctalia-shell",
+        "rev": "3d7b9869950592ff7cf3704f6a53afb169d850db",
+        "type": "github"
+      }
+    },
+    "nvwm-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1785168451,
+        "narHash": "sha256-doC9dUgGY4BGlBUbWf+WA+h9AtqL+qHJ9AfSEyoXURE=",
+        "owner": "Vifuddyxg",
+        "repo": "nvwm",
+        "rev": "58bfe34f14d532b6fdcac3149133cccd2e3bf653",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Vifuddyxg",
+        "repo": "nvwm",
+        "rev": "58bfe34f14d532b6fdcac3149133cccd2e3bf653",
+        "type": "github"
+      }
+    },
+    "pywmpkg": {
+      "inputs": {
+        "flake-utils": [
+          "newm-flake",
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "newm-flake",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1666033148,
+        "narHash": "sha256-KNaTXo2ZDPFVYH7JBogV5z1M39KiNyMAH2cQSrLa7fs=",
+        "owner": "jbuchermn",
+        "repo": "pywm",
+        "rev": "f20828d8c29dc430cf6d1e59e4fdf92dc3caf36a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "jbuchermn",
+        "repo": "pywm",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "finix": "finix",
+        "newm-flake": "newm-flake",
+        "nixpkgs": "nixpkgs_2",
+        "noctalia-src": "noctalia-src",
+        "nvwm-src": "nvwm-src",
+        "vxwm-src": "vxwm-src"
+      }
+    },
+    "vxwm-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1783203386,
+        "narHash": "sha256-YUDkr2J4tR59Nx9MdO28NkvE5xlDUAZ5Pnmd23nwcHE=",
+        "ref": "refs/heads/main",
+        "rev": "8b9f04c415a96c92fc36b7639cd1877903f3f0eb",
+        "revCount": 105,
+        "type": "git",
+        "url": "https://codeberg.org/wh1tepearl/vxwm"
+      },
+      "original": {
+        "rev": "8b9f04c415a96c92fc36b7639cd1877903f3f0eb",
+        "type": "git",
+        "url": "https://codeberg.org/wh1tepearl/vxwm"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
