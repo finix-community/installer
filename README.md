@@ -12,6 +12,22 @@ Finix. A render gate (`tests/render_and_eval.py`) evaluates every session combin
 against the Finix module set, so the configuration it writes stays within the options
 Finix defines.
 
+## Download
+
+A pre-built image is on the Internet Archive:
+**[finix-graphical-install](https://archive.org/details/finix-graphical-install)**
+([direct download](https://archive.org/download/finix-graphical-install/finix-graphical-install.iso),
+3.6 GB, x86_64 UEFI).
+
+Check it before writing it to a stick:
+
+```sh
+sha256sum finix-graphical-install.iso
+# 2e3ab8a0775fdc4b023b16bce850096be7090ee9bff7a3c2b6bfc4abae34169c
+```
+
+Or build it yourself — see [Building the ISO](#building-the-iso).
+
 ## What you get
 
 - **UEFI install with Limine**, alongside an existing OS if you want: the ESP is never
@@ -69,7 +85,8 @@ for you, and the ISO ships pre-built sessions for both variants.
 
 ## Building the ISO
 
-Requires Nix with flakes enabled.
+If you just want to install Finix, take the [pre-built image](#download) instead.
+Building requires Nix with flakes enabled.
 
 ```sh
 nix build .#iso
