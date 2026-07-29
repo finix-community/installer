@@ -15,9 +15,10 @@ Finix defines.
 ## Download
 
 A pre-built image is on the Internet Archive:
-**[finix-graphical-install](https://archive.org/details/finix-graphical-install)**
-([direct download](https://archive.org/download/finix-graphical-install/finix-graphical-install.iso),
-3.6 GB, x86_64 UEFI).
+**[finix-graphical-install](https://archive.org/details/finix-graphical-install)** —
+[direct download](https://archive.org/download/finix-graphical-install/finix-graphical-install.iso)
+or [torrent](https://archive.org/download/finix-graphical-install/finix-graphical-install_archive.torrent)
+(3.6 GB, x86_64 UEFI).
 
 Check it before writing it to a stick:
 
