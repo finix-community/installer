@@ -1,5 +1,5 @@
 {
-  description = "Finix installer ISO — graphical Calamares live image (finix-iso baseline)";
+  description = "finix installer ISO — graphical Calamares live image (finix-iso baseline)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -36,7 +36,7 @@
     };
 
     # The installer produces exactly two system flavors (see main.py):
-    #   - mdevd + seatd  (Finix default; compositors/PipeWire are rebuilt
+    #   - mdevd + seatd  (finix default; compositors/PipeWire are rebuilt
     #     from source against libudev-zero — the EXPENSIVE builds)
     #   - eudev + elogind (whenever KDE Plasma is selected; elogind's
     #     TakeDevice needs the udev database, so mdevd is out — mostly

@@ -24,7 +24,7 @@ stdenv.mkDerivation (finalAttrs: {
   '';
 
   meta = {
-    description = "Calamares modules for Finix (fork of calamares-nixos-extensions)";
+    description = "Calamares modules for finix (fork of calamares-nixos-extensions)";
     homepage = "https://github.com/NixOS/calamares-nixos-extensions";
     license = with lib.licenses; [
       mit

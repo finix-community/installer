@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# vm-boot-test.sh — boot the Finix live ISO under QEMU/OVMF (UEFI) headless and
-# capture framebuffer evidence to artifacts/vm-boot-test/.
+# vm-boot-test.sh — boot the finix live ISO under QEMU/OVMF (UEFI) headless and
+# capture framebuffer evidence to artifacts/cap1/.
 #
 # Usage: scripts/vm-boot-test.sh [path/to/finix-live.iso]
-#   With no argument, uses result/iso/finix-graphical-install*.iso at the repo root.
+#   With no argument, uses result/iso/finix-live-*.iso at the repo root.
 #
 # Requires: nix (fetches OVMF + qemu + imagemagick), python3 on PATH or via nix,
 # and read/write access to /dev/kvm for KVM acceleration (falls back to TCG).
@@ -14,7 +14,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-EVIDENCE_DIR="$REPO_ROOT/artifacts/vm-boot-test"
+EVIDENCE_DIR="$REPO_ROOT/artifacts/cap1"
 RAM_MB="${RAM_MB:-4096}"
 POLL_SECS=30
 
@@ -26,7 +26,7 @@ fi
 if [ $# -eq 1 ]; then
   ISO="$1"
 else
-  ISO="$(ls "$REPO_ROOT"/result/iso/finix-graphical-install*.iso 2>/dev/null | head -n1 || true)"
+  ISO="$(ls "$REPO_ROOT"/result/iso/finix-live-*.iso 2>/dev/null | head -n1 || true)"
   [ -n "$ISO" ] || ISO="$(ls "$REPO_ROOT"/result/iso/*.iso 2>/dev/null | head -n1 || true)"
 fi
 if [ -z "${ISO:-}" ] || [ ! -r "$ISO" ]; then

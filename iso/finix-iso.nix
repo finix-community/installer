@@ -1,8 +1,6 @@
-# Finix live ISO overlay module: branding, the Calamares fork, and the
-# pre-built session store contents.
+# finix live ISO overlay module — Cap.1 baseline (branding-only; install retargeting is Cap.3)
 #
-# MANUAL BUILD COMMANDS (heavy; not for CI — the cheap gate is
-# tests/render_and_eval.py, which only evaluates):
+# MANUAL BUILD COMMANDS (heavy; do not run in CI — eval-only gate is in .orchestrator/config.json):
 #
 #   Build ISO:
 #     nix build .#iso
@@ -19,8 +17,8 @@
 { lib, pkgs, finixPrebuiltSessions ? [ ], ... }:
 
 let
-  # Finix-branded GRUB theme: upstream nixos-grub2-theme with the NixOS
-  # wordmark/colors swapped for the Finix logomark (red #E33949) on a dark
+  # finix-branded GRUB theme: upstream nixos-grub2-theme with the NixOS
+  # wordmark/colors swapped for the finix logomark (red #E33949) on a dark
   # background. logo.png keeps the theme's exact 319x100 canvas so theme.txt
   # geometry stays valid.
   finixGrubTheme =
@@ -35,11 +33,11 @@ let
         # single bad image makes GRUB drop the whole theme (text-mode menu).
         magick -size 319x100 xc:none mark.png -gravity center -composite PNG32:$out/logo.png
         magick -size 1x1 xc:'#1A1A1A' PNG32:$out/background.png
-        # progress bar: NixOS blues -> Finix red + neutral gray
+        # progress bar: NixOS blues -> finix red + neutral gray
         sed -i -e 's/#5579C4/#E33949/g' -e 's/#7EBAE4/#4A4A4A/g' $out/theme.txt
       '';
 
-  # Dark splash with the Finix mark, used by the isolinux (BIOS) menu
+  # Dark splash with the finix mark, used by the isolinux (BIOS) menu
   # background and as the GRUB fallback background image.
   finixSplash =
     pkgs.runCommand "finix-splash.png"
@@ -50,24 +48,24 @@ let
       '';
 in
 {
-  # Live-ISO boot menu: stock GRUB/isolinux from iso-image.nix, branded "Finix"
+  # Live-ISO boot menu: stock GRUB/isolinux from iso-image.nix, branded "finix"
   # via system.nixos.distroName below. An all-Limine live ISO was tried
-  # (./limine-iso-boot.nix) and works in QEMU/OVMF, but Limine
-  # did not boot reliably under Ventoy on the hardware this was tested on
-  # ("config file not found", then a black screen even with a self-contained
-  # EFI image), while GRUB did. Limine remains the bootloader of the
-  # INSTALLED Finix system; re-enable the import to experiment.
+  # (./limine-iso-boot.nix, ADR-013/ADR-014) and works in QEMU/OVMF, but Limine
+  # does not boot reliably under Ventoy on the target laptop ("config file not
+  # found", then black screen even with a self-contained EFI image), while GRUB
+  # is hardware-proven there (ADR-009). Limine remains the bootloader of the
+  # INSTALLED finix system (ADR-002); re-enable the import to experiment.
   # imports = [ ./limine-iso-boot.nix ];
 
-  # main.py turns the generated /etc/finix into a git repo before
+  # main.py turns the generated /etc/nixos into a git repo before
   # `nixos-install --flake` (avoids a NAR hash mismatch on the path flake),
   # so the live installer environment must provide the git binary.
   environment.systemPackages = [ pkgs.git ];
 
-  # Wire the Finix-branded fork of calamares-nixos-extensions into the ISO.
+  # Wire the finix-branded fork of calamares-nixos-extensions into the ISO.
   # installation-cd-graphical-calamares-plasma6.nix consumes the attr
   # `calamares-nixos-extensions` from nixpkgs; this overlay replaces it with
-  # our local fork so Calamares shows Finix branding at runtime.
+  # our local fork so Calamares shows finix branding at runtime.
   nixpkgs.overlays = [
     (final: prev: {
       calamares-nixos-extensions = final.callPackage ../calamares-finix-extensions/package.nix { };
@@ -103,9 +101,9 @@ in
   # system.nixos.distroName) and /etc/os-release NAME in the live session.
   # distroId is left as "nixos" on purpose — tooling (nixos-version, calamares
   # os-release checks) keys off the id, and only the display name should change.
-  system.nixos.distroName = lib.mkForce "Finix";
+  system.nixos.distroName = lib.mkForce "finix";
 
-  # Finix-branded GRUB theme + splash images (defaults ship NixOS artwork).
+  # finix-branded GRUB theme + splash images (defaults ship NixOS artwork).
   isoImage.grubTheme = finixGrubTheme;
   isoImage.splashImage = finixSplash;
   isoImage.efiSplashImage = finixSplash;

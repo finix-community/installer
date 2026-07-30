@@ -39,10 +39,10 @@ Presentation
         Text {
             anchors.horizontalCenter: background1.horizontalCenter
             anchors.top: text1.bottom
-            text: "Finix builds packages in isolation from each other.<br/>"+
+            text: "finix builds packages in isolation from each other.<br/>"+
                   "This ensures that they are reproducible and don't<br/>"+
-                  "have undeclared dependencies, <b>so a build behaves<br/>"+
-                  "the same way on another machine.</b>"
+                  "have undeclared dependencies, so <b>if a package<br/>"+
+                  "works on one machine, it will also work on another.</b>"
             wrapMode: Text.WordWrap
             width: presentation.width
             horizontalAlignment: Text.Center
@@ -71,7 +71,7 @@ Presentation
         Text {
             anchors.horizontalCenter: background2.horizontalCenter
             anchors.top: text2.bottom
-            text: "Finix makes it <b>trivial to share development and build<br/>"+
+            text: "finix makes it <b>trivial to share development and build<br/>"+
                   "environments</b> for your projects, regardless of what<br/>"+
                   "programming languages and tools you’re using."
             wrapMode: Text.WordWrap
@@ -102,7 +102,7 @@ Presentation
         Text {
             anchors.horizontalCenter: background3.horizontalCenter
             anchors.top: text3.bottom
-            text: "Finix ensures that installing or upgrading one package<br/>"+
+            text: "finix ensures that installing or upgrading one package<br/>"+
                   "<b>cannot break other packages.</b> It allows you to <b>roll<br/>"+
                   "back to previous versions,</b> and ensures that no<br/>"+
                   "package is in an inconsistent state during an<br/>"+

@@ -115,13 +115,13 @@ navigation: widget
 # are visible as buttons there if the corresponding *show* keys
 # are set to "true" (they can also be overridden).
 strings:
-    productName:         Finix
-    shortProductName:    Finix
+    productName:         finix
+    shortProductName:    finix
     version:
     shortVersion:
-    versionedName:       Finix
-    shortVersionedName:  Finix
-    bootloaderEntryName: Finix
+    versionedName:       finix
+    shortVersionedName:  finix
+    bootloaderEntryName: finix
     productUrl:          https://github.com/finix-community/finix
     supportUrl:          https://github.com/finix-community/finix/tree/main/docs
     knownIssuesUrl:      https://github.com/finix-community/finix/issues

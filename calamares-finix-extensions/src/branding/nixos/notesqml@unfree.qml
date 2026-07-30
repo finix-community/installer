@@ -17,7 +17,7 @@ Page {
             Layout.fillWidth: true
 
             Text {
-                text: qsTr("Finix is fully open source, but it also provides optional software packages that do not respect users' freedom to run, copy, distribute, study, change and improve the software, and are commonly not open source. By default such \"unfree\" packages are not allowed, but you can enable it here. If you check this box, you agree that unfree software may be installed which might have additional End User License Agreements (EULAs) that you need to agree to. If not enabled, some hardware (notably Nvidia GPUs and some WiFi chips) might not work or not work optimally.<br/>")
+                text: qsTr("finix is fully open source, but it also provides optional software packages that do not respect users' freedom to run, copy, distribute, study, change and improve the software, and are commonly not open source. By default such \"unfree\" packages are not allowed, but you can enable it here. If you check this box, you agree that unfree software may be installed which might have additional End User License Agreements (EULAs) that you need to agree to. If not enabled, some hardware (notably Nvidia GPUs and some WiFi chips) might not work or not work optimally.<br/>")
                 width: parent.width
                 wrapMode: Text.WordWrap
             }

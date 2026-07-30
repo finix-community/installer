@@ -8,7 +8,7 @@
 #   - isoImage.contents      -> Limine file layout (kernel/initrd/limine.conf)
 #   - system.build.isoImage  -> make-iso9660-image with Limine El Torito images
 #
-# UEFI config lookup:
+# UEFI config lookup — the hard-learned part (real-hardware Ventoy test):
 # Limine checks `<EFI app path>/limine.conf` FIRST; only if absent does it scan
 # the boot drive's volumes. Under Ventoy the ISO9660 volume is not reliably
 # visible to that scan ("config file not found" on real hardware), so the
@@ -31,7 +31,7 @@
 # for legacy-BIOS boot from a dd'd USB). That would require forking
 # make-iso9660-image.sh for a post-xorriso step. BIOS El Torito (real CD,
 # Ventoy legacy mode) still works; UEFI USB works via -isohybrid-gpt-basdat.
-# Finix itself requires UEFI anyway.
+# finix itself requires UEFI anyway (ADR-002).
 
 { config, lib, pkgs, ... }:
 
