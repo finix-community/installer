@@ -877,6 +877,20 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # kwin creates its Xwayland sockets inside /tmp/.X11-unix and treats the
+    # directory as part of the installation: when it is missing, Xwayland is
+    # skipped and an X11-dependent step of the Plasma startup dies before
+    # plasmashell ever runs -- black screen, only the kwin cursor.  systemd
+    # distros create it via tmpfiles; on finix only xwayland-satellite's
+    # module ships the rule, so a Plasma pick without niri-noctalia booted
+    # without it.  (It "worked" whenever an X11 session had run first in the
+    # same boot: Xorg creates the directory itself.)  Same rules as the
+    # xwayland-satellite module.
+    finit.tmpfiles.rules = [
+      "D! /tmp/.X11-unix  1777 root root"
+      "z  /tmp/.X11-unix"
+    ];
+
     # Battery / power management backend for powerdevil.
     services.upower.enable = true;
 
