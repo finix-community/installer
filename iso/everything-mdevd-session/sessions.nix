@@ -8,9 +8,9 @@
   ...
 }:
 let
-  # start the PipeWire audio stack inside the user session (finix ships
-  # no service for it). IMPORTANT: use config.programs.*.package, not
-  # pkgs.* — under mdevd the packages are rebuilt against libudev-zero.
+  # start the pipewire stack inside the session (no user services).
+  # config.programs.*.package, not pkgs.*: under mdevd the packages
+  # are rebuilt against libudev-zero.
   audioStart = ''
     ${config.programs.pipewire.package}/bin/pipewire &
     ${config.programs.wireplumber.package}/bin/wireplumber &
@@ -22,7 +22,7 @@ let
   noctalia = pkgs.callPackage (inputs.noctalia-src + "/nix/package.nix") { };
 
   session-labwc-noctalia = pkgs.writeShellScript "session-labwc-noctalia" ''
-    ${config.programs.labwc.package}/bin/labwc &
+    ${config.programs.labwc.package}/bin/labwc >"$XDG_RUNTIME_DIR/labwc-compositor.log" 2>&1 &
     comp=$!
     sock=""
     i=0
@@ -41,14 +41,80 @@ let
       export WAYLAND_DISPLAY="$sock"
       # first XWayland display on a fresh boot
       export DISPLAY=:0
+      # finix wallpaper behind the shell (Noctalia can replace it
+      # from its own wallpaper settings later)
+      ${pkgs.swaybg}/bin/swaybg -i /etc/finix/wallpaper.png -m fill &
       ${audioStart}
-      ${noctalia}/bin/noctalia --daemon &
+      # Log to a file: Noctalia treats EGL/GL init failure as FATAL
+      # (e.g. broken GL on nouveau, or a hybrid laptop whose EGL picks
+      # the wrong DRM node) and greetd sessions have no visible stderr.
+      # If it dies right away, bring it back on Qt's software
+      # rasterizer rather than leaving the user with a bare compositor
+      # and no bar, launcher or lock screen.
+      (
+        ${noctalia}/bin/noctalia --daemon >"$XDG_RUNTIME_DIR/noctalia.log" 2>&1 &
+        np=$!
+        sleep 5
+        if ! kill -0 "$np" 2>/dev/null; then
+          echo "noctalia exited early; retrying with software rendering" \
+            >>"$XDG_RUNTIME_DIR/noctalia.log"
+          QT_QUICK_BACKEND=software LIBGL_ALWAYS_SOFTWARE=1 \
+            ${noctalia}/bin/noctalia --daemon \
+            >>"$XDG_RUNTIME_DIR/noctalia.log" 2>&1 &
+        fi
+      ) &
+    fi
+    wait "$comp"
+  '';
+
+  session-sway-noctalia = pkgs.writeShellScript "session-sway-noctalia" ''
+    ${config.programs.sway.package}/bin/sway -c /etc/sway/config-noctalia >"$XDG_RUNTIME_DIR/sway-compositor.log" 2>&1 &
+    comp=$!
+    sock=""
+    i=0
+    while [ $i -lt 100 ]; do
+      for s in "$XDG_RUNTIME_DIR"/wayland-*; do
+        case "$s" in
+          *.lock) ;;
+          *) if [ -S "$s" ]; then sock="$(basename "$s")"; break; fi ;;
+        esac
+      done
+      [ -n "$sock" ] && break
+      i=$((i + 1))
+      sleep 0.1
+    done
+    if [ -n "$sock" ]; then
+      export WAYLAND_DISPLAY="$sock"
+      # first XWayland display on a fresh boot
+      export DISPLAY=:0
+      # finix wallpaper behind the shell (Noctalia can replace it
+      # from its own wallpaper settings later)
+      ${pkgs.swaybg}/bin/swaybg -i /etc/finix/wallpaper.png -m fill &
+      ${audioStart}
+      # Log to a file: Noctalia treats EGL/GL init failure as FATAL
+      # (e.g. broken GL on nouveau, or a hybrid laptop whose EGL picks
+      # the wrong DRM node) and greetd sessions have no visible stderr.
+      # If it dies right away, bring it back on Qt's software
+      # rasterizer rather than leaving the user with a bare compositor
+      # and no bar, launcher or lock screen.
+      (
+        ${noctalia}/bin/noctalia --daemon >"$XDG_RUNTIME_DIR/noctalia.log" 2>&1 &
+        np=$!
+        sleep 5
+        if ! kill -0 "$np" 2>/dev/null; then
+          echo "noctalia exited early; retrying with software rendering" \
+            >>"$XDG_RUNTIME_DIR/noctalia.log"
+          QT_QUICK_BACKEND=software LIBGL_ALWAYS_SOFTWARE=1 \
+            ${noctalia}/bin/noctalia --daemon \
+            >>"$XDG_RUNTIME_DIR/noctalia.log" 2>&1 &
+        fi
+      ) &
     fi
     wait "$comp"
   '';
 
   session-niri-noctalia = pkgs.writeShellScript "session-niri-noctalia" ''
-    ${config.programs.niri.package}/bin/niri --session &
+    ${config.programs.niri.package}/bin/niri --session >"$XDG_RUNTIME_DIR/niri-compositor.log" 2>&1 &
     comp=$!
     sock=""
     i=0
@@ -75,14 +141,34 @@ let
         i=$((i + 1))
         sleep 0.1
       done
+      # finix wallpaper behind the shell (Noctalia can replace it
+      # from its own wallpaper settings later)
+      ${pkgs.swaybg}/bin/swaybg -i /etc/finix/wallpaper.png -m fill &
       ${audioStart}
-      ${noctalia}/bin/noctalia --daemon &
+      # Log to a file: Noctalia treats EGL/GL init failure as FATAL
+      # (e.g. broken GL on nouveau, or a hybrid laptop whose EGL picks
+      # the wrong DRM node) and greetd sessions have no visible stderr.
+      # If it dies right away, bring it back on Qt's software
+      # rasterizer rather than leaving the user with a bare compositor
+      # and no bar, launcher or lock screen.
+      (
+        ${noctalia}/bin/noctalia --daemon >"$XDG_RUNTIME_DIR/noctalia.log" 2>&1 &
+        np=$!
+        sleep 5
+        if ! kill -0 "$np" 2>/dev/null; then
+          echo "noctalia exited early; retrying with software rendering" \
+            >>"$XDG_RUNTIME_DIR/noctalia.log"
+          QT_QUICK_BACKEND=software LIBGL_ALWAYS_SOFTWARE=1 \
+            ${noctalia}/bin/noctalia --daemon \
+            >>"$XDG_RUNTIME_DIR/noctalia.log" 2>&1 &
+        fi
+      ) &
     fi
     wait "$comp"
   '';
 
   session-mango-noctalia = pkgs.writeShellScript "session-mango-noctalia" ''
-    ${config.programs.mango.package}/bin/mango &
+    ${config.programs.mango.package}/bin/mango >"$XDG_RUNTIME_DIR/mango-compositor.log" 2>&1 &
     comp=$!
     sock=""
     i=0
@@ -101,14 +187,54 @@ let
       export WAYLAND_DISPLAY="$sock"
       # first XWayland display on a fresh boot
       export DISPLAY=:0
+      # finix wallpaper behind the shell (Noctalia can replace it
+      # from its own wallpaper settings later)
+      ${pkgs.swaybg}/bin/swaybg -i /etc/finix/wallpaper.png -m fill &
       ${audioStart}
-      ${noctalia}/bin/noctalia --daemon &
+      # Log to a file: Noctalia treats EGL/GL init failure as FATAL
+      # (e.g. broken GL on nouveau, or a hybrid laptop whose EGL picks
+      # the wrong DRM node) and greetd sessions have no visible stderr.
+      # If it dies right away, bring it back on Qt's software
+      # rasterizer rather than leaving the user with a bare compositor
+      # and no bar, launcher or lock screen.
+      (
+        ${noctalia}/bin/noctalia --daemon >"$XDG_RUNTIME_DIR/noctalia.log" 2>&1 &
+        np=$!
+        sleep 5
+        if ! kill -0 "$np" 2>/dev/null; then
+          echo "noctalia exited early; retrying with software rendering" \
+            >>"$XDG_RUNTIME_DIR/noctalia.log"
+          QT_QUICK_BACKEND=software LIBGL_ALWAYS_SOFTWARE=1 \
+            ${noctalia}/bin/noctalia --daemon \
+            >>"$XDG_RUNTIME_DIR/noctalia.log" 2>&1 &
+        fi
+      ) &
     fi
     wait "$comp"
   '';
 
+  session-labwc = pkgs.writeShellScript "session-labwc" ''
+    ${audioStart}
+    exec ${config.programs.labwc.package}/bin/labwc
+  '';
+
+  session-sway = pkgs.writeShellScript "session-sway" ''
+    ${audioStart}
+    exec ${config.programs.sway.package}/bin/sway
+  '';
+
+  session-niri = pkgs.writeShellScript "session-niri" ''
+    ${audioStart}
+    exec ${config.programs.niri.package}/bin/niri --session
+  '';
+
+  session-mango = pkgs.writeShellScript "session-mango" ''
+    ${audioStart}
+    exec ${config.programs.mango.package}/bin/mango
+  '';
+
   # NVWM: vim-inspired tiling X11 window manager, built from the pinned
-  # source input (C99, only Xlib deps — builds in seconds).
+  # source input (C99, Xlib only)
   nvwm = pkgs.stdenv.mkDerivation {
     pname = "nvwm";
     version = "0-unstable-pinned";
@@ -127,12 +253,28 @@ let
   };
 
   session-nvwm = pkgs.writeShellScript "session-nvwm" ''
+    ${pkgs.xwallpaper}/bin/xwallpaper --zoom /etc/finix/wallpaper.png &
     ${audioStart}
     exec ${nvwm}/bin/nvwm
   '';
 
+  swayConfigBase = "${config.programs.sway.package}/etc/sway/config";
+  swayWallpaper = "output * bg /etc/finix/wallpaper.png fill";
+  swayConfig = pkgs.runCommand "sway-config" { } ''
+    # cat, not cp: cp keeps the store file's read-only mode and the
+    # append on the next line then fails with "Permission denied"
+    cat ${swayConfigBase} > $out
+    echo "${swayWallpaper}" >> $out
+  '';
+  # same config without the trailing bar {} block: Noctalia draws
+  # its own bar, and swaybar would sit on top of it
+  swayConfigNoctalia = pkgs.runCommand "sway-config-noctalia" { } ''
+    sed "/^bar {/,$ d" ${swayConfigBase} > $out
+    echo "${swayWallpaper}" >> $out
+  '';
+
   # vxwm: versatile dwm-style X11 WM, built from the pinned Codeberg
-  # source (C + Xlib/Xft/Xinerama; dwm-style compiled-in config —
+  # source (C + Xlib/Xft/Xinerama; dwm-style compiled-in config,
   # customize by editing config.def.h in an overridden build).
   vxwm = pkgs.stdenv.mkDerivation {
     pname = "vxwm";
@@ -154,6 +296,7 @@ let
   };
 
   session-vxwm = pkgs.writeShellScript "session-vxwm" ''
+    ${pkgs.xwallpaper}/bin/xwallpaper --zoom /etc/finix/wallpaper.png &
     ${audioStart}
     exec ${vxwm}/bin/vxwm
   '';
@@ -199,6 +342,14 @@ in
       Type=Application
       DesktopNames=labwc;wlroots
     '')
+    (pkgs.writeTextDir "share/wayland-sessions/sway-noctalia.desktop" ''
+      [Desktop Entry]
+      Name=Sway + Noctalia
+      Comment=Sway i3-compatible compositor with the Noctalia desktop shell
+      Exec=${pkgs.dbus}/bin/dbus-run-session -- ${session-sway-noctalia}
+      Type=Application
+      DesktopNames=sway;wlroots
+    '')
     (pkgs.writeTextDir "share/wayland-sessions/niri-noctalia.desktop" ''
       [Desktop Entry]
       Name=Niri + Noctalia
@@ -215,16 +366,44 @@ in
       Type=Application
       DesktopNames=mango;wlroots
     '')
+    (lib.hiPrio (pkgs.writeTextDir "share/wayland-sessions/labwc.desktop" ''
+      [Desktop Entry]
+      Name=Labwc
+      Comment=labwc stacking compositor
+      Exec=${pkgs.dbus}/bin/dbus-run-session -- ${session-labwc}
+      Type=Application
+      DesktopNames=labwc;wlroots
+    ''))
+    (lib.hiPrio (pkgs.writeTextDir "share/wayland-sessions/sway.desktop" ''
+      [Desktop Entry]
+      Name=Sway
+      Comment=Sway i3-compatible compositor
+      Exec=${pkgs.dbus}/bin/dbus-run-session -- ${session-sway}
+      Type=Application
+      DesktopNames=sway;wlroots
+    ''))
+    (lib.hiPrio (pkgs.writeTextDir "share/wayland-sessions/niri.desktop" ''
+      [Desktop Entry]
+      Name=Niri
+      Comment=Niri scrollable-tiling compositor
+      Exec=${pkgs.dbus}/bin/dbus-run-session -- ${session-niri}
+      Type=Application
+      DesktopNames=niri
+    ''))
+    (lib.hiPrio (pkgs.writeTextDir "share/wayland-sessions/mango.desktop" ''
+      [Desktop Entry]
+      Name=Mango
+      Comment=Mango tiling compositor
+      Exec=${pkgs.dbus}/bin/dbus-run-session -- ${session-mango}
+      Type=Application
+      DesktopNames=mango;wlroots
+    ''))
     (pkgs.writeTextDir "share/xsessions/nvwm.desktop" ''
       [Desktop Entry]
       Name=NVWM
       Comment=Vim-inspired tiling X11 window manager
-      # NO `--` here. X11 sessions are launched through tuigreet's
-      # --xsession-wrapper (startx ...), and startx treats the FIRST `--`
-      # as its own client/server separator: it took the session script as
-      # the X server binary, so no X server ever started ("xinit: unable to
-      # connect to X server: Connection refused"). dbus-run-session accepts
-      # PROGRAM without the separator.
+      # no `--`: startx (tuigreet's xsession wrapper) would treat it as
+      # its client/server separator
       Exec=${pkgs.dbus}/bin/dbus-run-session ${session-nvwm}
       Type=Application
       DesktopNames=nvwm
@@ -240,7 +419,7 @@ in
       Name=vxwm
       Comment=Versatile dwm-style X11 tiling window manager
       # no `--`: startx (the xsession wrapper) would read it as
-      # its client/server separator — see the nvwm entry
+      # its client/server separator, see the nvwm entry
       Exec=${pkgs.dbus}/bin/dbus-run-session ${session-vxwm}
       Type=Application
       DesktopNames=vxwm
@@ -258,13 +437,17 @@ in
       Type=Application
       DesktopNames=newm
     '')
+    pkgs.alacritty
+    pkgs.wob
+    pkgs.pulseaudio # pactl, used by newm's volume keys
     # niri's excellent built-in defaults (Mod+Shift+/ shows them all)
-    # spawn alacritty (Mod+T) and fuzzel (Mod+D) — install both so the
+    # spawn alacritty (Mod+T) and fuzzel (Mod+D); install both so the
     # defaults work; ~/.config/niri/config.kdl customizes as usual
     pkgs.alacritty
     pkgs.fuzzel
     # the launcher every default config above binds to Super+D
     pkgs.rofi
+    pkgs.swaybg
     (lib.setPrio (-15) (pkgs.writeShellScriptBin "poweroff" ''
       [ "$(id -u)" = 0 ] && exec ${config.finit.package}/bin/initctl poweroff
       exec sudo -n ${config.finit.package}/bin/initctl poweroff
@@ -283,195 +466,26 @@ in
   environment.etc."mango/config.conf".source =
     config.programs.mango.package.src + "/assets/config.conf";
   # labwc reads $XDG_CONFIG_DIRS/labwc/ when ~/.config/labwc/ is absent
-  environment.etc."xdg/labwc/rc.xml".text = ''
-      <?xml version="1.0"?>
-      <!-- finix default labwc config. Copy /etc/xdg/labwc/ to ~/.config/labwc/
-           to customize; your copy takes precedence. <default /> keeps all of
-           labwc's built-in key and mouse bindings (Alt-Tab, window menu, ...). -->
-      <labwc_config>
-        <keyboard>
-          <default />
-          <keybind key="W-Return">
-            <action name="Execute" command="foot" />
-          </keybind>
-          <keybind key="W-d">
-            <action name="Execute" command="rofi -show drun" />
-          </keybind>
-          <keybind key="W-q">
-            <action name="Close" />
-          </keybind>
-          <keybind key="W-S-e">
-            <action name="Exit" />
-          </keybind>
-        </keyboard>
-        <mouse>
-          <default />
-        </mouse>
-      </labwc_config>
-  '';
-  environment.etc."xdg/labwc/menu.xml".text = ''
-      <?xml version="1.0" encoding="UTF-8"?>
-      <!-- finix default labwc root menu (right-click on the desktop). -->
-      <openbox_menu>
-        <menu id="root-menu" label="finix">
-          <item label="Terminal (foot)">
-            <action name="Execute" command="foot" />
-          </item>
-          <item label="Applications (rofi)">
-            <action name="Execute" command="rofi -show drun" />
-          </item>
-          <item label="Reconfigure">
-            <action name="Reconfigure" />
-          </item>
-          <item label="Exit labwc">
-            <action name="Exit" />
-          </item>
-        </menu>
-      </openbox_menu>
+  environment.etc."xdg/labwc/rc.xml".source =
+    config.programs.labwc.package.src + "/docs/rc.xml";
+  environment.etc."xdg/labwc/menu.xml".source =
+    config.programs.labwc.package.src + "/docs/menu.xml";
+  environment.etc."xdg/labwc/autostart".text = ''
+      # finix default labwc autostart. Copy /etc/xdg/labwc/ to
+      # ~/.config/labwc/ to customize; your copy takes precedence.
+      swaybg -i /etc/finix/wallpaper.png -m fill >/dev/null 2>&1 &
   '';
   # sway probes $XDG_CONFIG_DIRS/sway/config and /etc/sway/config as
   # system fallbacks; ship the same file at both lookup paths
-  environment.etc."sway/config".text = ''
-      # finix default sway config. Copy to ~/.config/sway/config to customize;
-      # your copy takes precedence over this system fallback.
-      set $mod Mod4
-      set $left h
-      set $down j
-      set $up k
-      set $right l
-      set $term foot
-      set $menu rofi -show drun
-
-      output * bg #1A1A1A solid_color
-      floating_modifier $mod normal
-
-      bindsym $mod+Return exec $term
-      bindsym $mod+d exec $menu
-      bindsym $mod+Shift+q kill
-      bindsym $mod+Shift+c reload
-      bindsym $mod+Shift+e exec swaynag -t warning -m 'Exit sway?' -B 'Yes, exit sway' 'swaymsg exit'
-
-      bindsym $mod+$left focus left
-      bindsym $mod+$down focus down
-      bindsym $mod+$up focus up
-      bindsym $mod+$right focus right
-      bindsym $mod+Left focus left
-      bindsym $mod+Down focus down
-      bindsym $mod+Up focus up
-      bindsym $mod+Right focus right
-      bindsym $mod+Shift+$left move left
-      bindsym $mod+Shift+$down move down
-      bindsym $mod+Shift+$up move up
-      bindsym $mod+Shift+$right move right
-      bindsym $mod+Shift+Left move left
-      bindsym $mod+Shift+Down move down
-      bindsym $mod+Shift+Up move up
-      bindsym $mod+Shift+Right move right
-
-      bindsym $mod+1 workspace number 1
-      bindsym $mod+2 workspace number 2
-      bindsym $mod+3 workspace number 3
-      bindsym $mod+4 workspace number 4
-      bindsym $mod+5 workspace number 5
-      bindsym $mod+6 workspace number 6
-      bindsym $mod+7 workspace number 7
-      bindsym $mod+8 workspace number 8
-      bindsym $mod+9 workspace number 9
-      bindsym $mod+Shift+1 move container to workspace number 1
-      bindsym $mod+Shift+2 move container to workspace number 2
-      bindsym $mod+Shift+3 move container to workspace number 3
-      bindsym $mod+Shift+4 move container to workspace number 4
-      bindsym $mod+Shift+5 move container to workspace number 5
-      bindsym $mod+Shift+6 move container to workspace number 6
-      bindsym $mod+Shift+7 move container to workspace number 7
-      bindsym $mod+Shift+8 move container to workspace number 8
-      bindsym $mod+Shift+9 move container to workspace number 9
-
-      bindsym $mod+b splith
-      bindsym $mod+v splitv
-      bindsym $mod+s layout stacking
-      bindsym $mod+w layout tabbed
-      bindsym $mod+e layout toggle split
-      bindsym $mod+f fullscreen
-      bindsym $mod+Shift+space floating toggle
-      bindsym $mod+space focus mode_toggle
-
-      bar {
-          position top
-          status_command while date +'%Y-%m-%d %H:%M'; do sleep 60; done
-      }
-  '';
-  environment.etc."xdg/sway/config".text = ''
-      # finix default sway config. Copy to ~/.config/sway/config to customize;
-      # your copy takes precedence over this system fallback.
-      set $mod Mod4
-      set $left h
-      set $down j
-      set $up k
-      set $right l
-      set $term foot
-      set $menu rofi -show drun
-
-      output * bg #1A1A1A solid_color
-      floating_modifier $mod normal
-
-      bindsym $mod+Return exec $term
-      bindsym $mod+d exec $menu
-      bindsym $mod+Shift+q kill
-      bindsym $mod+Shift+c reload
-      bindsym $mod+Shift+e exec swaynag -t warning -m 'Exit sway?' -B 'Yes, exit sway' 'swaymsg exit'
-
-      bindsym $mod+$left focus left
-      bindsym $mod+$down focus down
-      bindsym $mod+$up focus up
-      bindsym $mod+$right focus right
-      bindsym $mod+Left focus left
-      bindsym $mod+Down focus down
-      bindsym $mod+Up focus up
-      bindsym $mod+Right focus right
-      bindsym $mod+Shift+$left move left
-      bindsym $mod+Shift+$down move down
-      bindsym $mod+Shift+$up move up
-      bindsym $mod+Shift+$right move right
-      bindsym $mod+Shift+Left move left
-      bindsym $mod+Shift+Down move down
-      bindsym $mod+Shift+Up move up
-      bindsym $mod+Shift+Right move right
-
-      bindsym $mod+1 workspace number 1
-      bindsym $mod+2 workspace number 2
-      bindsym $mod+3 workspace number 3
-      bindsym $mod+4 workspace number 4
-      bindsym $mod+5 workspace number 5
-      bindsym $mod+6 workspace number 6
-      bindsym $mod+7 workspace number 7
-      bindsym $mod+8 workspace number 8
-      bindsym $mod+9 workspace number 9
-      bindsym $mod+Shift+1 move container to workspace number 1
-      bindsym $mod+Shift+2 move container to workspace number 2
-      bindsym $mod+Shift+3 move container to workspace number 3
-      bindsym $mod+Shift+4 move container to workspace number 4
-      bindsym $mod+Shift+5 move container to workspace number 5
-      bindsym $mod+Shift+6 move container to workspace number 6
-      bindsym $mod+Shift+7 move container to workspace number 7
-      bindsym $mod+Shift+8 move container to workspace number 8
-      bindsym $mod+Shift+9 move container to workspace number 9
-
-      bindsym $mod+b splith
-      bindsym $mod+v splitv
-      bindsym $mod+s layout stacking
-      bindsym $mod+w layout tabbed
-      bindsym $mod+e layout toggle split
-      bindsym $mod+f fullscreen
-      bindsym $mod+Shift+space floating toggle
-      bindsym $mod+space focus mode_toggle
-
-      bar {
-          position top
-          status_command while date +'%Y-%m-%d %H:%M'; do sleep 60; done
-      }
-  '';
-  environment.pathsToLink = [ "/share/xsessions" ];
+  environment.etc."sway/config".source = swayConfig;
+  environment.etc."xdg/sway/config".source = swayConfig;
+  environment.etc."sway/config-noctalia".source = swayConfigNoctalia;
+  # launchers (rofi -show drun, app menus) read .desktop files from
+  # $XDG_DATA_DIRS = /run/current-system/sw/share; finix does not link
+  # /share/applications by default, so nothing would be discoverable
+  environment.pathsToLink = [ "/share/applications" "/share/xsessions" ];
+  # /share/icons + /share/pixmaps, so those entries have icons
+  xdg.icons.enable = true;
   security.wrappers.X.enable = lib.mkForce true;
   system.activation.scripts.seed-user-configs = {
     deps = [ "users" ];

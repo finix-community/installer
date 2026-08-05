@@ -5,3 +5,6 @@ tests/out/
 __pycache__/
 *.pyc
 .direnv/
+.claude-flow/
+__pycache__/
+*.pyc

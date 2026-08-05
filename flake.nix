@@ -2,7 +2,12 @@
   description = "finix installer ISO — graphical Calamares live image (finix-iso baseline)";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # Pinned to NIXPKGS_REV from main.py, NOT to a floating branch: the live
+    # ISO only saves the target from compiling niri/pipewire/noctalia/... if
+    # its prebuilt store paths are byte-identical to the ones the generated
+    # /etc/finix flake evaluates, and a different nixpkgs makes every single
+    # one of them miss.
+    nixpkgs.url = "github:NixOS/nixpkgs/e2587caef70cea85dd97d7daab492899902dbf5d";
 
     # Pinned to the exact revisions the installer (main.py) writes into the
     # generated system flake — keep these in sync with NIXPKGS_REV & friends
@@ -56,6 +61,12 @@
         (dir + "/branding.nix")
       ]
       ++ nixpkgs.lib.optional withPlasma (dir + "/plasma.nix")
+      # NOTE: this list is a second copy of the one main.py bakes into the
+      # generated flake (cfgflaketemplate).  The gate evaluates the generated
+      # one, this builds the ISO's prebuilt systems -- a module added to only
+      # one of them passes the gate and then fails the ISO build (or worse,
+      # ships an ISO whose prebuilt store does not match what gets installed).
+      # Keep them in sync.
       ++ (with finix.nixosModules; [
         nix-daemon
         openssh
@@ -68,6 +79,7 @@
         dhcpcd
         iwd
         greetd
+        regreet
         networkmanager
         sddm
         upower

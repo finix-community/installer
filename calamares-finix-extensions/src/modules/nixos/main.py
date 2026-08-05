@@ -103,19 +103,64 @@ cfgnetfinix = """  # networking: dhcpcd + iwd (`iwctl` to connect to wifi)
   # spams the log with ipv6_addaddr1 errors
   services.dhcpcd.extraArgs = [ "--noipv6rs" ];
   services.iwd.enable = true;
+  # openresolv owns /etc/resolv.conf.  Without it dhcpcd's hook has no
+  # resolvconf on its PATH and iwd sets NameResolvingService=none, so a
+  # wifi-only machine ends up with no nameserver at all and every browser
+  # lookup fails.  name_servers_append (not name_servers, which prepends and
+  # would shadow LAN names) keeps the network's own resolver first and adds a
+  # public fallback behind it.
+  programs.resolvconf.enable = true;
+  programs.resolvconf.settings.name_servers_append = [ "1.1.1.1" "1.0.0.1" ];
+  # glibc reads at most three nameservers (MAXNS).  A router that advertises
+  # itself over v4 plus two v6 addresses already fills all three slots, so the
+  # append above silently drops out exactly on the networks where a fallback
+  # would matter.  It stays (it is what saves a machine that gets none), but
+  # the real protection is bounding the wait: with the default timeout:5
+  # attempts:2 a dead resolver stalls every lookup for half a minute, which is
+  # what "the page never loads but I am connected" looks like from a browser.
+  programs.resolvconf.settings.resolv_conf_options = [ "timeout:2" "attempts:2" ];
+  # finix builds openresolv with RESTARTCMD="initctl restart $1", but the
+  # daemons that call resolvconf (iwd) do not have initctl on their PATH, so
+  # every DNS update logs "initctl: command not found".  Nothing on finix needs
+  # restarting when resolv.conf changes; make the hook a no-op instead.
+  programs.resolvconf.settings.libc_restart = "true";
 
 """
 
-cfggreettui = """  # login: greetd/tuigreet, listing the installed sessions
-  services.greetd.enable = true;
-  services.greetd.settings.default_session.command = "${pkgs.tuigreet}/bin/tuigreet --time --remember --remember-session --sessions /run/current-system/sw/share/wayland-sessions";
-
+# finix's greetd module defaults to terminal.vt = "next", which hands the
+# greeter a *different*, freshly allocated VT every time it starts.  After the
+# first logout the new greeter lands on a VT nothing switches to, so the screen
+# keeps showing the dead session's framebuffer: the greeter is running and
+# accepts typing, but is invisible.  Pin it to VT 1 and take tty1 away from
+# getty (which otherwise fights it for the same console) — this is the same
+# arrangement NixOS's own greetd module uses.
+cfggreetvt = """  services.greetd.settings.terminal.vt = 1;
+  services.getty.ttys = [ "tty2" "tty3" "tty4" "tty5" "tty6" ];
 """
 
-cfggreettuix11 = """  # login: greetd/tuigreet, listing wayland and X11 sessions
-  services.greetd.enable = true;
-  services.greetd.settings.default_session.command = "${pkgs.tuigreet}/bin/tuigreet --time --remember --remember-session --sessions /run/current-system/sw/share/wayland-sessions --xsessions /run/current-system/sw/share/xsessions --xsession-wrapper '${config.programs.xinit.package}/bin/startx ${pkgs.coreutils}/bin/env'";
-
+# regreet (GTK) under cage, in place of tuigreet.  Beyond looking better, it
+# sidesteps the invisible-greeter problem by construction: cage drives its own
+# DRM output instead of painting a VT, so the console handover that blanks
+# tuigreet's already-drawn frame cannot touch it.  The module writes
+# services.greetd.settings.default_session.command itself, so nothing here may
+# set that option too -- two plain definitions would collide and fail to
+# evaluate.  It also pulls in accounts-daemon, orders greetd after it, and
+# picks the reboot/poweroff commands for seatd vs elogind on its own.
+cfggreetregreet = """  # login: regreet (GTK greeter) running under cage
+  programs.regreet.enable = true;
+  # regreet builds its session list by appending /xsessions and
+  # /wayland-sessions to every XDG_DATA_DIRS entry, and falls back to
+  # /usr/share/... which does not exist here.  greetd's PAM stack sets no
+  # environment (pam_env with readenv=0), so without this the greeter comes up
+  # with an empty session list and there is nothing to log in to.  The X11
+  # startx prefix is added by the module itself when programs.xorg is on.
+  programs.regreet.compositor.environment.XDG_DATA_DIRS = "/run/current-system/sw/share";
+  programs.regreet.settings.background = {
+    path = "@@etcdir@@/wallpaper.png";
+    fit = "Cover";
+  };
+  programs.regreet.settings.GTK.application_prefer_dark_theme = true;
+""" + cfggreetvt + """
 """
 
 cfggreetnone = """  # login: console only (no display manager)
@@ -154,6 +199,7 @@ cfgsessions = {
     "labwc": {
         "comment": "desktop: labwc (lightweight Wayland compositor)",
         "opts": ["programs.labwc.enable"],
+        "audio": True,
     },
     "labwc-noctalia": {
         "comment": "desktop: labwc + Noctalia shell (bar, launcher, lock, OSD)",
@@ -164,6 +210,7 @@ cfgsessions = {
     "lxqt": {
         "comment": "desktop: LXQt (full desktop environment, Wayland session on labwc)",
         "opts": ["programs.lxqt.enable", "programs.labwc.enable"],
+        "audio": True,
     },
     "plasma": {
         "comment": "desktop: KDE Plasma 6 (Wayland; experimental on finix)",
@@ -175,10 +222,18 @@ cfgsessions = {
     "sway": {
         "comment": "desktop: Sway (i3-like tiling Wayland compositor)",
         "opts": ["programs.sway.enable"],
+        "audio": True,
+    },
+    "sway-noctalia": {
+        "comment": "desktop: Sway + Noctalia shell (bar, launcher, lock, OSD)",
+        "opts": ["programs.sway.enable"],
+        "noctalia": "sway",
+        "audio": True,
     },
     "niri": {
         "comment": "desktop: Niri (scrollable-tiling Wayland compositor)",
         "opts": ["programs.niri.enable"],
+        "audio": True,
     },
     "niri-noctalia": {
         "comment": "desktop: Niri + Noctalia shell (with xwayland-satellite)",
@@ -202,6 +257,7 @@ cfgsessions = {
         "comment": "desktop: Mango / MangoWC (dwl-based tiling Wayland compositor)",
         "opts": ["programs.mango.enable"],
         "mango": True,
+        "audio": True,
     },
     "mango-noctalia": {
         "comment": "desktop: Mango + Noctalia shell",
@@ -339,6 +395,8 @@ cfgpkgs = """  # List packages installed in system profile. To search, run:
     git
     wget
     iproute2
+    iputils # ping; absent from the default profile, so every "is the net up?"
+    # check on a fresh install failed with "ping: command not found"
     pciutils
     foot # wayland terminal
     firefox
@@ -431,6 +489,9 @@ cfgflaketemplate = """{
         dhcpcd
         iwd
         greetd
+        # regreet pulls in accounts-daemon and greetd itself, but the module
+        # list is explicit here: finix imports only a base set by default
+        regreet
         networkmanager
         sddm
         upower
@@ -499,13 +560,24 @@ def parse_desktop_selection(raw_choice, warn=None):
         # Per-compositor flags for the default-config emission (keybinds +
         # launcher; see build_sessions_nix). lxqt runs on labwc too.
         "labwc": any(s in ("labwc", "labwc-noctalia", "lxqt") for s in selected),
-        "sway": "sway" in selected,
+        "sway": any(s in ("sway", "sway-noctalia") for s in selected),
         "niri": any(s in ("niri", "niri-noctalia") for s in selected),
         "noctalia": any(cfgsessions[s].get("noctalia") for s in selected),
         "noctalia_compositors": [
             cfgsessions[s]["noctalia"]
             for s in selected
             if cfgsessions[s].get("noctalia")
+        ],
+        # Compositors whose *plain* (shell-less) session was actually asked
+        # for.  The flags above are true for the Noctalia variants too --
+        # they need the same module and config -- so keying the session
+        # entries off them handed anyone who picked "sway + Noctalia" a bare
+        # "Sway" entry in the greeter as well.
+        "plain_sessions": [
+            comp
+            for comp in ("labwc", "sway", "niri", "mango")
+            for names in [("labwc", "lxqt") if comp == "labwc" else (comp,)]
+            if any(n in selected for n in names)
         ],
     }
     return selected, needs
@@ -633,6 +705,30 @@ def build_hardware_drivers(cpu_vendor, gpu_vendors, allow_unfree):
             "  # AMD GPU detected: fully covered by the in-kernel amdgpu driver\n"
             "  # and Mesa (already enabled via hardware.graphics.enable).\n"
         )
+
+    # The greeter loses a race against the GPU driver.  finit starts greetd
+    # about a second before the kernel hands the console over to the DRM
+    # framebuffer, and that handover resizes the VT (80x25 -> native) and
+    # clears it.  tuigreet has already painted its frame by then and only
+    # repaints on input, so the greeter of the *first* boot is invisible:
+    # keystrokes show up, and after a logout it renders fine because the
+    # driver has long since settled.  Loading KMS from the initrd moves the
+    # handover to before userspace exists, which removes the race outright.
+    kms = []
+    if "0x8086" in gpu_vendors:
+        kms.append("i915")
+    if "0x1002" in gpu_vendors:
+        kms.append("amdgpu")
+    if "0x10de" in gpu_vendors:
+        kms.append("nouveau")
+    if kms:
+        out += (
+            "  # early KMS: bring the framebuffer up in the initrd so the\n"
+            "  # console handover cannot blank the greeter (see above).\n"
+            "  boot.initrd.kernelModules = [ "
+            + " ".join('"%s"' % m for m in kms)
+            + " ];\n"
+        )
     return out + "\n"
 
 
@@ -726,7 +822,13 @@ let
     ${config.programs.wireplumber.package}/bin/wireplumber &
     ${config.programs.pipewire.package}/bin/pipewire-pulse &
     ${kdePackages.kservice}/bin/kbuildsycoca6 || true
-    exec ${kdePackages.plasma-workspace}/bin/startplasma-wayland
+    # greetd sessions have no visible stderr, so a Plasma that comes up as a
+    # black screen with a cursor (kwin_wayland alive, plasmashell not) leaves
+    # nothing to look at.  Log to $HOME, not $XDG_RUNTIME_DIR: the latter is
+    # tmpfs and the evidence evaporates on reboot, which is exactly when it
+    # is needed.
+    exec ${kdePackages.plasma-workspace}/bin/startplasma-wayland \
+      >"$HOME/plasma.log" 2>&1
   '';
 
   sessionFile = pkgs.writeTextDir "share/wayland-sessions/plasma.desktop" ''
@@ -951,6 +1053,12 @@ _NOCTALIA_COMPOSITORS = {
         "desktop_names": "labwc;wlroots",
         "comment": "labwc stacking compositor with the Noctalia desktop shell",
     },
+    "sway": {
+        "name": "Sway",
+        "cmd": "${config.programs.sway.package}/bin/sway",
+        "desktop_names": "sway;wlroots",
+        "comment": "Sway i3-compatible compositor with the Noctalia desktop shell",
+    },
     "niri": {
         "name": "Niri",
         "cmd": "${config.programs.niri.package}/bin/niri --session",
@@ -966,9 +1074,26 @@ _NOCTALIA_COMPOSITORS = {
 }
 
 
-def _noctalia_session_nix(comp, wallpaper):
+def _noctalia_cmd_args(comp):
+    """Extra compositor arguments for the Noctalia variant of a session.
+
+    sway's upstream config ends in a `bar {}` block, which puts swaybar on
+    screen above Noctalia's own bar.  Point this session at the stripped copy
+    emitted next to it instead of editing the shared /etc/sway/config, so a
+    plain Sway session selected alongside it keeps its bar."""
+    if comp == "sway":
+        return " -c /etc/sway/config-noctalia"
+    return ""
+
+
+def _noctalia_session_nix(comp, wallpaper, replaces_plain=False):
     """One '<compositor> + Noctalia' launcher: start the compositor, wait
-    for its wayland socket, then start audio and noctalia next to it."""
+    for its wayland socket, then start audio and noctalia next to it.
+
+    With replaces_plain the entry takes over the compositor's own
+    <comp>.desktop filename at a higher priority than the finix module's
+    hiPrio copy, so the greeter lists this session instead of -- rather than
+    beside -- a plain one nobody selected."""
     c = _NOCTALIA_COMPOSITORS[comp]
     # noctalia's logout needs $NIRI_SOCKET; export it explicitly since
     # noctalia is started as the compositor's sibling
@@ -986,7 +1111,10 @@ def _noctalia_session_nix(comp, wallpaper):
         )
     script = (
         '  session-' + comp + '-noctalia = pkgs.writeShellScript "session-' + comp + '-noctalia" \'\'\n'
-        '    ' + c["cmd"] + ' &\n'
+        # Keep the compositor's stderr too.  A GPU/EGL failure happens before
+        # Noctalia can connect, so noctalia.log alone cannot explain it.
+        '    ' + c["cmd"] + _noctalia_cmd_args(comp)
+        + ' >"$XDG_RUNTIME_DIR/' + comp + '-compositor.log" 2>&1 &\n'
         '    comp=$!\n'
         '    sock=""\n'
         '    i=0\n'
@@ -1011,22 +1139,65 @@ def _noctalia_session_nix(comp, wallpaper):
         '      ${pkgs.swaybg}/bin/swaybg -i ' + wallpaper + ' -m fill &\n'
         '      ${audioStart}\n'
         '      # Log to a file: Noctalia treats EGL/GL init failure as FATAL\n'
-        '      # (e.g. broken GL on nouveau) and greetd sessions have no\n'
-        '      # visible stderr\n'
-        '      ${noctalia}/bin/noctalia --daemon >"$XDG_RUNTIME_DIR/noctalia.log" 2>&1 &\n'
+        '      # (e.g. broken GL on nouveau, or a hybrid laptop whose EGL picks\n'
+        '      # the wrong DRM node) and greetd sessions have no visible stderr.\n'
+        '      # If it dies right away, bring it back on Qt\'s software\n'
+        '      # rasterizer rather than leaving the user with a bare compositor\n'
+        '      # and no bar, launcher or lock screen.\n'
+        '      (\n'
+        '        ${noctalia}/bin/noctalia --daemon >"$XDG_RUNTIME_DIR/noctalia.log" 2>&1 &\n'
+        '        np=$!\n'
+        '        sleep 5\n'
+        '        if ! kill -0 "$np" 2>/dev/null; then\n'
+        '          echo "noctalia exited early; retrying with software rendering" \\\n'
+        '            >>"$XDG_RUNTIME_DIR/noctalia.log"\n'
+        '          QT_QUICK_BACKEND=software LIBGL_ALWAYS_SOFTWARE=1 \\\n'
+        '            ${noctalia}/bin/noctalia --daemon \\\n'
+        '            >>"$XDG_RUNTIME_DIR/noctalia.log" 2>&1 &\n'
+        '        fi\n'
+        '      ) &\n'
         '    fi\n'
         '    wait "$comp"\n'
         '  \'\';\n'
     )
+    # -20 beats the finix module's own lib.hiPrio (-10) copy of <comp>.desktop,
+    # so the profile keeps exactly one entry for this compositor.
+    fname = (comp if replaces_plain else comp + "-noctalia") + ".desktop"
+    open_prio = "    (lib.setPrio (-20) (" if replaces_plain else "    ("
+    close_prio = "))\n" if replaces_plain else ")\n"
     desktop = (
-        '    (pkgs.writeTextDir "share/wayland-sessions/' + comp + '-noctalia.desktop" \'\'\n'
+        open_prio + 'pkgs.writeTextDir "share/wayland-sessions/' + fname + '" \'\'\n'
         '      [Desktop Entry]\n'
         '      Name=' + c["name"] + ' + Noctalia\n'
         '      Comment=' + c["comment"] + '\n'
         '      Exec=${pkgs.dbus}/bin/dbus-run-session -- ${session-' + comp + '-noctalia}\n'
         '      Type=Application\n'
         '      DesktopNames=' + c["desktop_names"] + '\n'
-        '    \'\')\n'
+        '    \'\'' + close_prio
+    )
+    return script, desktop
+
+
+def _plain_audio_session_nix(comp):
+    """Custom desktop entry for a normal Wayland session.  Finix has no
+    systemd user services, therefore PipeWire must be started by the session
+    rather than merely enabled in the system configuration."""
+    c = _NOCTALIA_COMPOSITORS[comp]
+    script = (
+        '  session-' + comp + ' = pkgs.writeShellScript "session-' + comp + '" \'\'\n'
+        '    ${audioStart}\n'
+        '    exec ' + c["cmd"] + '\n'
+        '  \'\';\n'
+    )
+    desktop = (
+        '    (lib.hiPrio (pkgs.writeTextDir "share/wayland-sessions/' + comp + '.desktop" \'\'\n'
+        '      [Desktop Entry]\n'
+        '      Name=' + c["name"] + '\n'
+        '      Comment=' + c["comment"].replace(" with the Noctalia desktop shell", "") + '\n'
+        '      Exec=${pkgs.dbus}/bin/dbus-run-session -- ${session-' + comp + '}\n'
+        '      Type=Application\n'
+        '      DesktopNames=' + c["desktop_names"] + '\n'
+        '    \'\'))\n'
     )
     return script, desktop
 
@@ -1078,122 +1249,6 @@ _NVWM_NIX_DESKTOP = """    (pkgs.writeTextDir "share/xsessions/nvwm.desktop" ''
 # documented /etc fallback path so ~/.config always wins.
 # common binds: Super+Enter = foot, Super+D = rofi, Super+Q = close
 
-_LABWC_RC_XML = """<?xml version="1.0"?>
-<!-- finix default labwc config. Copy /etc/xdg/labwc/ to ~/.config/labwc/
-     to customize; your copy takes precedence. <default /> keeps all of
-     labwc's built-in key and mouse bindings (Alt-Tab, window menu, ...). -->
-<labwc_config>
-  <keyboard>
-    <default />
-    <keybind key="W-Return">
-      <action name="Execute" command="foot" />
-    </keybind>
-    <keybind key="W-d">
-      <action name="Execute" command="rofi -show drun" />
-    </keybind>
-    <keybind key="W-q">
-      <action name="Close" />
-    </keybind>
-    <keybind key="W-S-e">
-      <action name="Exit" />
-    </keybind>
-  </keyboard>
-  <mouse>
-    <default />
-  </mouse>
-</labwc_config>
-"""
-
-_LABWC_MENU_XML = """<?xml version="1.0" encoding="UTF-8"?>
-<!-- finix default labwc root menu (right-click on the desktop). -->
-<openbox_menu>
-  <menu id="root-menu" label="finix">
-    <item label="Terminal (foot)">
-      <action name="Execute" command="foot" />
-    </item>
-    <item label="Applications (rofi)">
-      <action name="Execute" command="rofi -show drun" />
-    </item>
-    <item label="Reconfigure">
-      <action name="Reconfigure" />
-    </item>
-    <item label="Exit labwc">
-      <action name="Exit" />
-    </item>
-  </menu>
-</openbox_menu>
-"""
-
-_SWAY_CONFIG = """# finix default sway config. Copy to ~/.config/sway/config to customize;
-# your copy takes precedence over this system fallback.
-set $mod Mod4
-set $left h
-set $down j
-set $up k
-set $right l
-set $term foot
-set $menu rofi -show drun
-
-output * bg @@wallpaper@@ fill
-floating_modifier $mod normal
-
-bindsym $mod+Return exec $term
-bindsym $mod+d exec $menu
-bindsym $mod+Shift+q kill
-bindsym $mod+Shift+c reload
-bindsym $mod+Shift+e exec swaynag -t warning -m 'Exit sway?' -B 'Yes, exit sway' 'swaymsg exit'
-
-bindsym $mod+$left focus left
-bindsym $mod+$down focus down
-bindsym $mod+$up focus up
-bindsym $mod+$right focus right
-bindsym $mod+Left focus left
-bindsym $mod+Down focus down
-bindsym $mod+Up focus up
-bindsym $mod+Right focus right
-bindsym $mod+Shift+$left move left
-bindsym $mod+Shift+$down move down
-bindsym $mod+Shift+$up move up
-bindsym $mod+Shift+$right move right
-bindsym $mod+Shift+Left move left
-bindsym $mod+Shift+Down move down
-bindsym $mod+Shift+Up move up
-bindsym $mod+Shift+Right move right
-
-bindsym $mod+1 workspace number 1
-bindsym $mod+2 workspace number 2
-bindsym $mod+3 workspace number 3
-bindsym $mod+4 workspace number 4
-bindsym $mod+5 workspace number 5
-bindsym $mod+6 workspace number 6
-bindsym $mod+7 workspace number 7
-bindsym $mod+8 workspace number 8
-bindsym $mod+9 workspace number 9
-bindsym $mod+Shift+1 move container to workspace number 1
-bindsym $mod+Shift+2 move container to workspace number 2
-bindsym $mod+Shift+3 move container to workspace number 3
-bindsym $mod+Shift+4 move container to workspace number 4
-bindsym $mod+Shift+5 move container to workspace number 5
-bindsym $mod+Shift+6 move container to workspace number 6
-bindsym $mod+Shift+7 move container to workspace number 7
-bindsym $mod+Shift+8 move container to workspace number 8
-bindsym $mod+Shift+9 move container to workspace number 9
-
-bindsym $mod+b splith
-bindsym $mod+v splitv
-bindsym $mod+s layout stacking
-bindsym $mod+w layout tabbed
-bindsym $mod+e layout toggle split
-bindsym $mod+f fullscreen
-bindsym $mod+Shift+space floating toggle
-bindsym $mod+space focus mode_toggle
-
-bar {
-    position top
-    status_command while date +'%Y-%m-%d %H:%M'; do sleep 60; done
-}
-"""
-
 def _nix_etc_text(path, body):
     """environment.etc."<path>".text = ''<body>''; with proper indentation.
     The bodies contain no Nix-string specials ( '' or ${ )."""
@@ -1215,7 +1270,11 @@ def build_sessions_nix(needs, etcdir="/etc/finix"):
     pkg_parts = []
     etc_parts = []
 
-    if needs["noctalia"] or needs["nvwm"] or needs["vxwm"] or needs["newm"]:
+    # Every graphical session launcher below interpolates ${audioStart}, so it
+    # must be bound whenever any of them is emitted.  Gating it on the shell
+    # sessions only left a plain sway/labwc/niri/mango install with an
+    # "undefined variable 'audioStart'" sessions.nix that no longer evaluates.
+    if needs["audio"]:
         let_parts.append(
             '  # start the pipewire stack inside the session (no user services).\n'
             '  # config.programs.*.package, not pkgs.*: under mdevd the packages\n'
@@ -1234,9 +1293,21 @@ def build_sessions_nix(needs, etcdir="/etc/finix"):
             '  noctalia = pkgs.callPackage (inputs.noctalia-src + "/nix/package.nix") { };\n'
         )
         for comp in needs["noctalia_compositors"]:
-            script, desktop = _noctalia_session_nix(comp, wallpaper)
+            script, desktop = _noctalia_session_nix(
+                comp, wallpaper, replaces_plain=comp not in needs["plain_sessions"]
+            )
             let_parts.append(script)
             pkg_parts.append(desktop)
+
+    # The compositor modules provide plain session files, but on Finix those
+    # do not start PipeWire (there is no systemd user manager).  Shadow them
+    # with equivalent launchers that do -- but only for compositors whose
+    # plain session was actually selected; the Noctalia entry above takes over
+    # the filename otherwise.
+    for comp in needs["plain_sessions"]:
+        script, desktop = _plain_audio_session_nix(comp)
+        let_parts.append(script)
+        pkg_parts.append(desktop)
 
     if needs["nvwm"]:
         let_parts.append(_NVWM_NIX_LET.replace("@@wallpaper@@", wallpaper))
@@ -1260,8 +1331,15 @@ def build_sessions_nix(needs, etcdir="/etc/finix"):
         etc_parts.append(
             "  # labwc reads $XDG_CONFIG_DIRS/labwc/ when ~/.config/labwc/ is absent\n"
         )
-        etc_parts.append(_nix_etc_text("xdg/labwc/rc.xml", _LABWC_RC_XML))
-        etc_parts.append(_nix_etc_text("xdg/labwc/menu.xml", _LABWC_MENU_XML))
+        # labwc ships no config in its package output, but its source tree
+        # carries the documented defaults; take the keybindings and root menu
+        # from there rather than from a hand-written copy.
+        etc_parts.append(
+            '  environment.etc."xdg/labwc/rc.xml".source =\n'
+            '    config.programs.labwc.package.src + "/docs/rc.xml";\n'
+            '  environment.etc."xdg/labwc/menu.xml".source =\n'
+            '    config.programs.labwc.package.src + "/docs/menu.xml";\n'
+        )
         etc_parts.append(
             _nix_etc_text(
                 "xdg/labwc/autostart",
@@ -1272,13 +1350,37 @@ def build_sessions_nix(needs, etcdir="/etc/finix"):
         )
 
     if needs["sway"]:
-        sway_cfg = _SWAY_CONFIG.replace("@@wallpaper@@", wallpaper)
+        # Upstream's own default config, straight out of the package, so the
+        # keybindings are the ones sway documents rather than a hand-written
+        # subset that silently drifts from them.  Only the wallpaper line is
+        # added (upstream ships it commented out, pointing at a file that does
+        # not exist here).
+        let_parts.append(
+            '  swayConfigBase = "${config.programs.sway.package}/etc/sway/config";\n'
+            '  swayWallpaper = "output * bg ' + wallpaper + ' fill";\n'
+            '  swayConfig = pkgs.runCommand "sway-config" { } \'\'\n'
+            '    # cat, not cp: cp keeps the store file\'s read-only mode and the\n'
+            '    # append on the next line then fails with "Permission denied"\n'
+            '    cat ${swayConfigBase} > $out\n'
+            '    echo "${swayWallpaper}" >> $out\n'
+            '  \'\';\n'
+            '  # same config without the trailing bar {} block: Noctalia draws\n'
+            '  # its own bar, and swaybar would sit on top of it\n'
+            '  swayConfigNoctalia = pkgs.runCommand "sway-config-noctalia" { } \'\'\n'
+            '    sed "/^bar {/,$ d" ${swayConfigBase} > $out\n'
+            '    echo "${swayWallpaper}" >> $out\n'
+            '  \'\';\n'
+        )
         etc_parts.append(
             "  # sway probes $XDG_CONFIG_DIRS/sway/config and /etc/sway/config as\n"
             "  # system fallbacks; ship the same file at both lookup paths\n"
+            '  environment.etc."sway/config".source = swayConfig;\n'
+            '  environment.etc."xdg/sway/config".source = swayConfig;\n'
         )
-        etc_parts.append(_nix_etc_text("sway/config", sway_cfg))
-        etc_parts.append(_nix_etc_text("xdg/sway/config", sway_cfg))
+        if "sway" in needs["noctalia_compositors"]:
+            etc_parts.append(
+                '  environment.etc."sway/config-noctalia".source = swayConfigNoctalia;\n'
+            )
 
     if needs["vxwm"]:
         let_parts.append(
@@ -1356,12 +1458,22 @@ def build_sessions_nix(needs, etcdir="/etc/finix"):
             "    pkgs.wob\n"
             "    pkgs.pulseaudio # pactl, used by newm's volume keys\n"
         )
-    if needs["nvwm"] or needs["vxwm"]:
-        # /share/xsessions is not linked by default; the greeter needs it
-        # to list X11 sessions
+    if not needs["console_only"]:
+        # finix's system path links /share/wayland-sessions but NOT
+        # /share/applications, so `rofi -show drun` (and every other launcher,
+        # and any app menu) had no .desktop files to discover at all.  Icons
+        # live behind xdg.icons, which is off by default, so entries also came
+        # up blank.  Every graphical install needs both.
         etc_parts.append(
-            '  environment.pathsToLink = [ "/share/xsessions" ];\n'
+            '  # launchers (rofi -show drun, app menus) read .desktop files from\n'
+            '  # $XDG_DATA_DIRS = /run/current-system/sw/share; finix does not link\n'
+            '  # /share/applications by default, so nothing would be discoverable\n'
+            '  environment.pathsToLink = [ "/share/applications" "/share/xsessions" ];\n'
+            '  # /share/icons + /share/pixmaps, so those entries have icons\n'
+            '  xdg.icons.enable = true;\n'
         )
+
+    if needs["nvwm"] or needs["vxwm"]:
         # force the setuid X wrapper on: our xorg-server has no logind
         # integration, so rootless X under elogind doesn't work
         etc_parts.append(
@@ -1993,13 +2105,12 @@ def run():
             for conf in localeconf:
                 catenate(variables, conf, localeconf.get(conf).split("/")[0])
 
-    # greeter: greetd/tuigreet (with xsessions when an X11 session is in)
+    # greeter: regreet under cage (it discovers X11 and Wayland sessions alike,
+    # so there is no separate X11 variant to pick any more)
     if needs["console_only"]:
         cfg += cfggreetnone
-    elif needs["nvwm"] or needs["vxwm"]:
-        cfg += cfggreettuix11
     else:
-        cfg += cfggreettui
+        cfg += cfggreetregreet
 
     # audio stack (pipewire)
     if needs["audio"]:

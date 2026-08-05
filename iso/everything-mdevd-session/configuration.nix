@@ -54,7 +54,20 @@
 
   # --- networking (dhcpcd + iwd; no NetworkManager/systemd) ---
   services.dhcpcd.enable = true;
+  services.dhcpcd.extraArgs = [ "--noipv6rs" ];
   services.iwd.enable = true;
+  programs.resolvconf.enable = true;
+  programs.resolvconf.settings.name_servers_append = [ "1.1.1.1" "1.0.0.1" ];
+  # glibc reads at most three nameservers (MAXNS); a router advertising itself
+  # over v4 + two v6 addresses fills all three, so the append above drops out
+  # exactly where a fallback would matter.  Bound the wait instead: the default
+  # timeout:5 attempts:2 stalls every lookup for half a minute when a resolver
+  # is dead, which is what "connected but the page never loads" looks like.
+  programs.resolvconf.settings.resolv_conf_options = [ "timeout:2" "attempts:2" ];
+  # openresolv is built with RESTARTCMD="initctl restart $1" and iwd, which
+  # calls resolvconf, has no initctl on its PATH; make the hook a no-op rather
+  # than log "initctl: command not found" on every DNS update.
+  programs.resolvconf.settings.libc_restart = "true";
 
   networking.hostName = "finix"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
@@ -69,9 +82,24 @@
   # Select internationalisation properties.
   i18n.defaultLocale = "en_US.UTF-8";
 
-  # --- login: greetd/tuigreet, listing Wayland and X11 sessions ---
-  services.greetd.enable = true;
-  services.greetd.settings.default_session.command = "${pkgs.tuigreet}/bin/tuigreet --time --remember --remember-session --sessions /run/current-system/sw/share/wayland-sessions --xsessions /run/current-system/sw/share/xsessions --xsession-wrapper '${config.programs.xinit.package}/bin/startx ${pkgs.coreutils}/bin/env'";
+  # --- login: regreet (GTK) under cage ---
+  # cage drives its own DRM output instead of painting a VT, so the console
+  # handover that blanks tuigreet's already-drawn frame cannot reach it.  The
+  # module sets services.greetd.settings.default_session.command itself, so
+  # nothing here may define that option too.
+  programs.regreet.enable = true;
+  # regreet appends /xsessions and /wayland-sessions to every XDG_DATA_DIRS
+  # entry and otherwise falls back to /usr/share/..., which does not exist
+  # here; greetd's PAM stack exports no environment, so without this the
+  # session list comes up empty.
+  programs.regreet.compositor.environment.XDG_DATA_DIRS = "/run/current-system/sw/share";
+  programs.regreet.settings.background = {
+    path = "/etc/finix/wallpaper.png";
+    fit = "Cover";
+  };
+  programs.regreet.settings.GTK.application_prefer_dark_theme = true;
+  services.greetd.settings.terminal.vt = 1;
+  services.getty.ttys = [ "tty2" "tty3" "tty4" "tty5" "tty6" ];
 
   # --- audio: PipeWire + WirePlumber (started by the session launchers) ---
   programs.pipewire.enable = true;
@@ -125,6 +153,8 @@
     git
     wget
     iproute2 # `ip addr` & friends — finix's base ships no network CLI at all
+    iputils # ping; without it every "is the net up?" check fails with
+    # "ping: command not found" on a fresh install
     pciutils # lspci — invaluable for GPU/driver debugging
     foot # Wayland terminal
     firefox # web browser (plain package; finix has no programs.firefox module)
