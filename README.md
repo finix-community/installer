@@ -24,7 +24,7 @@ Check it before writing it to a stick:
 
 ```sh
 sha256sum finix-graphical-install.iso
-# feb08e169bb4c0979b1e2b8478474270149bbe91732f0f7a8d7abc49396eb680
+# 67d603a5d5af94cbdc8d3d9c503640064a53826096dfbd70b6096b3a27aa83ce
 ```
 
 Or build it yourself — see [Building the ISO](#building-the-iso).
