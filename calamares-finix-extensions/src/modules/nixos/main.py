@@ -307,6 +307,15 @@ cfgbootnone = """  # No bootloader (bootloader managed manually).
 
 """
 
+cfgemergency = """  # Emergency access (chosen on the installer's Debugging page): when
+  # stage-1 boot fails (root filesystem not found, mdevd trouble...), open a
+  # root rescue shell on the console instead of rebooting after 10s.
+  # Anyone with physical access can use that shell; remove this line to
+  # disable it again.
+  boot.initrd.emergencyAccess = true;
+
+"""
+
 # LUKS keyfile handling is bootloader-specific and unverified on limine/finix; skip.
 cfgbootgrubcrypt = ""
 
@@ -515,6 +524,12 @@ cfgflaketemplate = """{
         modulesPath = toString nixpkgs + "/nixos/modules";
         inherit inputs;
       };
+    } // {
+      # `sudo nixos-rebuild edit` runs `nix edit`, which opens the file named
+      # by meta.position ("file:line"). A nixosConfiguration normally has no
+      # meta, so nix errors out with "cannot find position information";
+      # point it at the system configuration instead.
+      meta.position = "@@etcdir@@/configuration.nix:1";
     };
   };
 }
@@ -583,7 +598,7 @@ def parse_desktop_selection(raw_choice, warn=None):
     return selected, needs
 
 
-def build_flake(needs):
+def build_flake(needs, etcdir="/etc/finix"):
     """Render the system flake for the selected sessions. Extra inputs and
     the vendored plasma module are only wired in when needed."""
     extra_inputs = ""
@@ -621,6 +636,7 @@ def build_flake(needs):
     flake = flake.replace(
         "@@plasma_import@@", "\n        (./plasma.nix)" if needs["plasma"] else ""
     )
+    flake = flake.replace("@@etcdir@@", etcdir)
     return flake
 
 
@@ -2026,6 +2042,13 @@ def run():
     if ngc_cfg["Defaults"]["Kernel"] == "latest":
         cfg += cfglatestkernel
 
+    # Emergency access (initrd rescue shell) from the Debugging page. The
+    # packagechooser is patched to MultiSelection, so the value can be a
+    # comma-separated list; rescue wins if it was ticked at all.
+    debug_choice = (gs.value("packagechooser_debug") or "").split(",")
+    if "rescue" in [x.strip() for x in debug_choice]:
+        cfg += cfgemergency
+
     # LUKS is not supported yet (finix has no boot.initrd.luks.devices);
     # warn instead of emitting options that don't exist
     for part in gs.value("partitions"):
@@ -2050,6 +2073,38 @@ def run():
         elif part["mountPoint"] == "/boot":
             boot_is_partition = True
             boot_is_encrypted = part["fsName"] in ["luks", "luks2"]
+
+    # Preflight: limine copies every generation's kernel+initrd (~55 MiB)
+    # onto the ESP, so an ESP without room for even one generation makes the
+    # install crash later with a bare ENOSPC traceback. Fail early with a
+    # clear message instead; warn when it only fits a couple of generations.
+    if fw_type == "efi" and boot_is_partition:
+        try:
+            st = os.statvfs(os.path.join(root_mount_point, "boot"))
+            boot_free_mib = st.f_bavail * st.f_frsize // (1024 * 1024)
+        except OSError as e:
+            libcalamares.utils.warning(
+                "could not stat target /boot: {}".format(e)
+            )
+        else:
+            if boot_free_mib < 96:
+                return (
+                    _("EFI partition is too small"),
+                    _(
+                        "The EFI system partition mounted at /boot has only "
+                        "{} MiB free, but finix needs at least ~96 MiB there "
+                        "for the kernel and initrd of one system generation "
+                        "(1 GiB total is recommended so several generations "
+                        "fit). Please go back to partitioning and enlarge "
+                        "the EFI partition."
+                    ).format(boot_free_mib),
+                )
+            elif boot_free_mib < 300:
+                libcalamares.utils.warning(
+                    "target /boot has only {} MiB free; each finix "
+                    "generation needs ~55 MiB, so rebuilds may fill it "
+                    "quickly (1 GiB recommended)".format(boot_free_mib)
+                )
 
     status = _("Configuring finix")
     libcalamares.job.setprogress(0.03)
@@ -2393,7 +2448,7 @@ def run():
     # Write the flake.nix that makes the installed system a finix system (finit PID 1).
     flakepath = os.path.join(root_mount_point, etcrel, "flake.nix")
     libcalamares.utils.host_env_process_output(
-        ["cp", "/dev/stdin", flakepath], None, build_flake(needs)
+        ["cp", "/dev/stdin", flakepath], None, build_flake(needs, etcdir)
     )
 
     # Write sessions.nix (always imported by the flake; may be a no-op module).
@@ -2506,7 +2561,16 @@ def run():
 
     # build nixos-install command
     nixosInstallCmd = [ "pkexec" ]
-    nixosInstallCmd.extend(generateProxyStrings())
+    proxyEnv = generateProxyStrings()
+    if not proxyEnv:
+        proxyEnv = ["env"]
+    # nixos-install otherwise exports TMPDIR=<mountpoint>/tmp.XXX (a host-side
+    # path) and nixos-enter leaks it into the target chroot when running the
+    # activation script; the path does not exist inside the chroot, so finix's
+    # setup-etc.sh mktemp calls fail and /etc is left half-populated during
+    # the install. /tmp exists on both sides.
+    proxyEnv.append("TMPDIR=/tmp")
+    nixosInstallCmd.extend(proxyEnv)
     nixosInstallCmd.extend(
         [
             "nixos-install",
