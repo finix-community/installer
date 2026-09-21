@@ -31,6 +31,40 @@
         "type": "github"
       }
     },
+    "glueqs-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1788708441,
+        "narHash": "sha256-U46u92oUPIGIMlg9ELznePy48j8z69XMBb07G74c6wQ=",
+        "owner": "vladbiber",
+        "repo": "glueqs",
+        "rev": "1c787c3fa8ade2d7fe1148c5f76facdb8313053e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "vladbiber",
+        "repo": "glueqs",
+        "rev": "1c787c3fa8ade2d7fe1148c5f76facdb8313053e",
+        "type": "github"
+      }
+    },
+    "gluewc-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1788706568,
+        "narHash": "sha256-BxomToUZnGkcyeM8vDHA161lPaVBrDC2PAjPR5irbCE=",
+        "owner": "vladbiber",
+        "repo": "gluewc",
+        "rev": "0e602ca06e35e6d4f535a077dd89b15c4fdc6f89",
+        "type": "github"
+      },
+      "original": {
+        "owner": "vladbiber",
+        "repo": "gluewc",
+        "rev": "0e602ca06e35e6d4f535a077dd89b15c4fdc6f89",
+        "type": "github"
+      }
+    },
     "newm-flake": {
       "inputs": {
         "flake-utils": "flake-utils",
@@ -146,11 +180,31 @@
     "root": {
       "inputs": {
         "finix": "finix",
+        "glueqs-src": "glueqs-src",
+        "gluewc-src": "gluewc-src",
         "newm-flake": "newm-flake",
         "nixpkgs": "nixpkgs_2",
         "noctalia-src": "noctalia-src",
         "nvwm-src": "nvwm-src",
+        "scenefx-src": "scenefx-src",
         "vxwm-src": "vxwm-src"
+      }
+    },
+    "scenefx-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1782624992,
+        "narHash": "sha256-vUjLG6eubEhJJVa9LPygIcVmNoHwYbSUTJcWEcbxnU4=",
+        "owner": "wlrfx",
+        "repo": "scenefx",
+        "rev": "37ccd723bef49e6891156ffafce8f549f01446cc",
+        "type": "github"
+      },
+      "original": {
+        "owner": "wlrfx",
+        "repo": "scenefx",
+        "rev": "37ccd723bef49e6891156ffafce8f549f01446cc",
+        "type": "github"
       }
     },
     "vxwm-src": {

@@ -377,6 +377,8 @@ def flake_modules(needs):
             mods.append(name)
     if needs["plasma"]:
         mods.append("upower")
+    if needs["elogind"] and "xorg" not in mods:
+        mods.append("xorg")
     return mods
 
 

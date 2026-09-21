@@ -67,6 +67,9 @@ def write_combo(raw, workdir):
     flavor, cfg = base_config(needs)
     src = os.path.join(REPO, "iso", flavor)
 
+    if needs["console_only"]:
+        cfg = cfg.replace(main.cfggreet.replace("@@etcdir@@", "/etc/finix"), "")
+        cfg = cfg.replace(main.cfgaudio, "")
     enables = "".join("  {} = true;\n".format(opt) for opt in needs["opts"])
     idx = cfg.rstrip().rfind("\n}")
     cfg = cfg[:idx] + "\n" + enables + cfg[idx:]
