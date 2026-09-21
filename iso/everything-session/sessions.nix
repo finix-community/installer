@@ -226,6 +226,7 @@ let
       libgbm
       libxcb
       libxcb-wm
+      lcms2
     ];
     mesonFlags = [ "-Dexamples=false" "-Dwerror=false" ];
   };
