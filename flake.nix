@@ -1,19 +1,10 @@
 {
-  description = "finix installer ISO — graphical Calamares live image (finix-iso baseline)";
+  description = "finix installer ISO";
 
+  # same revisions as calamares-finix-extensions/src/modules/nixos/main.py,
+  # so the packages prebuilt into the ISO are the ones the installed system uses
   inputs = {
-    # Pinned to NIXPKGS_REV from main.py, NOT to a floating branch: the live
-    # ISO only saves the target from compiling niri/pipewire/noctalia/... if
-    # its prebuilt store paths are byte-identical to the ones the generated
-    # /etc/finix flake evaluates, and a different nixpkgs makes every single
-    # one of them miss.
     nixpkgs.url = "github:NixOS/nixpkgs/e2587caef70cea85dd97d7daab492899902dbf5d";
-
-    # Pinned to the exact revisions the installer (main.py) writes into the
-    # generated system flake — keep these in sync with NIXPKGS_REV & friends
-    # in calamares-finix-extensions/src/modules/nixos/main.py. They are used
-    # to pre-build the from-source session packages into the live ISO's store
-    # so that installation on low-end machines copies instead of compiling.
     finix.url = "github:finix-community/finix/8a9b75a16b6f399e12d031dcd714a938af40c9b5";
     noctalia-src = {
       url = "github:noctalia-dev/noctalia-shell/3d7b9869950592ff7cf3704f6a53afb169d850db";
@@ -27,48 +18,45 @@
       url = "git+https://codeberg.org/wh1tepearl/vxwm?rev=8b9f04c415a96c92fc36b7639cd1877903f3f0eb";
       flake = false;
     };
-    # newm is a flake with its OWN lock and deliberately NO follows: it only
-    # builds against the old nixpkgs its lockfile pins.
+    gluewc-src = {
+      url = "github:vladbiber/gluewc/0e602ca06e35e6d4f535a077dd89b15c4fdc6f89";
+      flake = false;
+    };
+    glueqs-src = {
+      url = "github:vladbiber/glueqs/1c787c3fa8ade2d7fe1148c5f76facdb8313053e";
+      flake = false;
+    };
+    scenefx-src = {
+      url = "github:wlrfx/scenefx/37ccd723bef49e6891156ffafce8f549f01446cc";
+      flake = false;
+    };
     newm-flake.url = "github:jbuchermn/newm/d120fcc390eba70593aecfafbafefe8647fd5c92";
   };
 
-  outputs = inputs @ { self, nixpkgs, finix, noctalia-src, nvwm-src, vxwm-src, newm-flake }: let
-    # Same pkgs instantiation as the generated /etc/finix/flake.nix — package
-    # identity (store paths) must match what the installed system evaluates.
+  outputs = inputs @ { self, nixpkgs, finix, noctalia-src, newm-flake, ... }: let
+    lib = nixpkgs.lib;
+
     pkgsTarget = import nixpkgs {
       system = "x86_64-linux";
       config.allowUnfree = true;
     };
 
-    # The installer produces exactly two system flavors (see main.py):
-    #   - mdevd + seatd  (finix default; compositors/PipeWire are rebuilt
-    #     from source against libudev-zero — the EXPENSIVE builds)
-    #   - eudev + elogind (whenever KDE Plasma is selected; elogind's
-    #     TakeDevice needs the udev database, so mdevd is out — mostly
-    #     stock cached packages plus a custom xorg-server-with-eudev)
-    # Both "everything" systems are evaluated here ONLY to reference the
-    # exact per-session packages for pre-building into the ISO. Files are
-    # vendored from the installer's render gate into iso/everything-session/
-    # (all 11 sessions => eudev flavor) and iso/everything-mdevd-session/
-    # (all except plasma => mdevd flavor).
+    # the two systems the installer can produce with every desktop selected:
+    # eudev + elogind (plasma) and mdevd + seatd (everything else)
     mkInstalledSystem = dir: withPlasma: finix.lib.finixSystem {
       inherit (pkgsTarget) lib;
 
       modules = [
-        { nixpkgs.pkgs = nixpkgs.lib.mkDefault pkgsTarget; }
+        { nixpkgs.pkgs = lib.mkDefault pkgsTarget; }
         (dir + "/configuration.nix")
         (dir + "/sessions.nix")
         (dir + "/branding.nix")
       ]
-      ++ nixpkgs.lib.optional withPlasma (dir + "/plasma.nix")
-      # NOTE: this list is a second copy of the one main.py bakes into the
-      # generated flake (cfgflaketemplate).  The gate evaluates the generated
-      # one, this builds the ISO's prebuilt systems -- a module added to only
-      # one of them passes the gate and then fails the ISO build (or worse,
-      # ships an ISO whose prebuilt store does not match what gets installed).
-      # Keep them in sync.
+      ++ lib.optional withPlasma (dir + "/plasma.nix")
       ++ (with finix.nixosModules; [
         nix-daemon
+        chronyd
+        bluetooth
         openssh
         sysklogd
         limine
@@ -78,15 +66,11 @@
         bash
         dhcpcd
         iwd
-        greetd
         regreet
-        networkmanager
-        sddm
         upower
         labwc
         sway
         niri
-        hyprland
         lxqt
         mango
         pipewire
@@ -94,7 +78,6 @@
         rtkit
         xwayland-satellite
         xorg
-        xinit
       ]);
 
       specialArgs = {
@@ -106,34 +89,6 @@
     everythingSystem = mkInstalledSystem ./iso/everything-session true;
     everythingMdevdSystem = mkInstalledSystem ./iso/everything-mdevd-session false;
 
-    ecfg = everythingSystem.config;
-    mcfg = everythingMdevdSystem.config;
-
-    # Replicas of the installer's sessions.nix builds (same pkgs, same src,
-    # same arguments => identical store paths).
-    noctaliaPkg = pkgsTarget.callPackage (noctalia-src + "/nix/package.nix") { };
-    nvwmPkg = pkgsTarget.stdenv.mkDerivation {
-      pname = "nvwm";
-      version = "0-unstable-pinned";
-      src = nvwm-src;
-      buildInputs = with pkgsTarget; [
-        libx11
-        libxinerama
-        libxrandr
-        libxcomposite
-        libxrender
-      ];
-      makeFlags = [
-        "PREFIX=${placeholder "out"}"
-        "SYSCONFDIR=${placeholder "out"}/etc"
-      ];
-    };
-
-    # Per-session packages a flavor resolves. Under mdevd these are the
-    # from-source libudev-zero rebuilds; under eudev they are mostly stock
-    # (cached) plus the custom xorg-server-with-eudev. Embedding BOTH sets
-    # in the ISO store means nixos-install copies instead of compiling,
-    # whatever the user selects — critical for low-RAM machines.
     sessionPackagesOf = cfg: [
       cfg.programs.labwc.package
       cfg.programs.sway.package
@@ -144,41 +99,20 @@
       cfg.programs.xorg.package
       cfg.programs.xinit.package
       cfg.programs.xwayland-satellite.package
-    ];
+    ]
+    ++ lib.filter (p: lib.elem (p.pname or "") [ "gluewc" "nvwm" "vxwm" ]) cfg.environment.systemPackages;
 
-    # Replica of the installer's vxwm build (same pkgs, same src, same
-    # arguments => identical store path).
-    vxwmPkg = pkgsTarget.stdenv.mkDerivation {
-      pname = "vxwm";
-      version = "2.3-pinned";
-      src = vxwm-src;
-      buildInputs = with pkgsTarget; [
-        libx11
-        libxft
-        libxinerama
-        fontconfig
-        freetype
+    prebuiltSessionPackages =
+      sessionPackagesOf everythingMdevdSystem.config
+      ++ sessionPackagesOf everythingSystem.config
+      ++ [
+        (pkgsTarget.callPackage (noctalia-src + "/nix/package.nix") { })
+        newm-flake.packages.x86_64-linux.newm
+        pkgsTarget.quickshell
+        pkgsTarget.rofi
       ];
-      makeFlags = [
-        "PREFIX=${placeholder "out"}"
-        "X11INC=${pkgsTarget.libx11.dev}/include"
-        "X11LIB=${pkgsTarget.libx11}/lib"
-        "FREETYPEINC=${pkgsTarget.freetype.dev}/include/freetype2"
-      ];
-    };
-
-    prebuiltSessionPackages = sessionPackagesOf mcfg ++ sessionPackagesOf ecfg ++ [
-      noctaliaPkg
-      nvwmPkg
-      vxwmPkg
-      # newm's whole closure (its own old-nixpkgs python/wlroots) — huge win
-      # to pre-embed: the target would otherwise build all of it from source
-      newm-flake.packages.x86_64-linux.newm
-      # not substitutable from cache.nixos.org on this pin
-      pkgsTarget.rofi
-    ];
   in {
-    nixosConfigurations.finix-iso = nixpkgs.lib.nixosSystem {
+    nixosConfigurations.finix-iso = lib.nixosSystem {
       system = "x86_64-linux";
       specialArgs = {
         finixPrebuiltSessions = prebuiltSessionPackages;
@@ -189,17 +123,13 @@
       ];
     };
 
-    # Exposed for local pre-building / verification. (Indexed names: the two
-    # flavors contain same-named packages with different store paths.)
     packages.x86_64-linux.prebuilt-sessions = pkgsTarget.linkFarm "finix-prebuilt-sessions" (
-      nixpkgs.lib.imap0 (i: p: {
+      lib.imap0 (i: p: {
         name = "${toString i}-${p.pname or p.name}";
         path = p;
       }) prebuiltSessionPackages
     );
 
-    # The per-flavor toplevels, for verifying that no heavy source builds
-    # remain once the prebuilt set is realized (nix-store --dry-run).
     packages.x86_64-linux.everything-toplevel =
       everythingSystem.config.system.build.toplevel;
     packages.x86_64-linux.everything-mdevd-toplevel =

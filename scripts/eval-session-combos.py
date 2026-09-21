@@ -1,21 +1,7 @@
 #!/usr/bin/env python3
-"""Evaluate the flake the installer generates, once per desktop selection.
-
-The `nix eval .#nixosConfigurations.finix-iso...` gate only ever sees the
-everything-at-once systems in iso/everything-*-session/, so a fault that only
-shows up when ONE desktop is picked slips straight through it — that is exactly
-how `sessions.nix` shipped a `${audioStart}` with no binding for a plain
-sway/labwc/niri/mango install.
-
-For each combo this renders the real generated flake.nix + sessions.nix from
-main.py, pairs them with the vendored configuration.nix (session enables
-rewritten to just that combo) and evaluates the resulting system toplevel.
-
-    python3 scripts/eval-session-combos.py            # every combo
-    python3 scripts/eval-session-combos.py sway niri  # only these
-
-Evaluation is not a build: it is minutes, not hours, and needs no GPU/RAM.
-"""
+# evaluates the flake the installer generates, one desktop selection at a time:
+#   python3 scripts/eval-session-combos.py            # every combo
+#   python3 scripts/eval-session-combos.py sway niri  # only these
 import os
 import re
 import shutil
@@ -40,10 +26,6 @@ sys.modules["libcalamares.utils"] = _utils
 sys.path.insert(0, MODULE_DIR)
 import main  # noqa: E402
 
-# One combo per shape the installer can produce: each plain compositor on its
-# own (the case the everything-systems mask), each Noctalia pairing, both X11
-# window managers, newm's own-nixpkgs flake, LXQt, Plasma's eudev flavor, the
-# desktopless install, and one multi-select.
 COMBOS = [
     "labwc",
     "sway",
@@ -59,24 +41,20 @@ COMBOS = [
     "lxqt",
     "plasma",
     "minimal",
+    "gluewc",
+    "gluewc-glueqs",
+    "gluewc,gluewc-glueqs",
     "sway,niri-noctalia,nvwm",
-    # a Wayland+shell session next to an X11 WM: this is the selection the
-    # greeter's --xsessions branch is built for, and it is what people
-    # actually pick, so keep it covered rather than testing it by hand
     "mango-noctalia,nvwm",
 ]
 
-# lines the vendored configuration.nix carries for its own session set; they
-# are replaced with the combo's own enables
 _SESSION_LINE = re.compile(
     r"^  (programs\.(labwc|sway|niri|mango|lxqt|plasma|xorg|xinit|xwayland-satellite)\.enable = true;"
-    r"|# --- desktop: .*---)\s*$"
+    r"|# desktop)\s*$"
 )
 
 
 def base_config(needs):
-    """The vendored configuration.nix with its session enables swapped for
-    this combo's. Plasma forces the eudev/elogind flavor."""
     flavor = "everything-session" if needs["elogind"] else "everything-mdevd-session"
     path = os.path.join(REPO, "iso", flavor, "configuration.nix")
     with open(path) as f:
@@ -84,23 +62,14 @@ def base_config(needs):
     return flavor, "".join(lines)
 
 
-def session_enables(selected):
-    out = ""
-    for s in selected:
-        out += "  # --- {} ---\n".format(main.cfgsessions[s]["comment"])
-        for opt in main.cfgsessions[s]["opts"]:
-            out += "  {} = true;\n".format(opt)
-    return out
-
-
 def write_combo(raw, workdir):
     selected, needs = main.parse_desktop_selection(raw)
     flavor, cfg = base_config(needs)
     src = os.path.join(REPO, "iso", flavor)
 
-    # splice the combo's enables in ahead of the closing brace
+    enables = "".join("  {} = true;\n".format(opt) for opt in needs["opts"])
     idx = cfg.rstrip().rfind("\n}")
-    cfg = cfg[:idx] + "\n" + session_enables(selected) + cfg[idx:]
+    cfg = cfg[:idx] + "\n" + enables + cfg[idx:]
 
     with open(os.path.join(workdir, "configuration.nix"), "w") as f:
         f.write(cfg)
@@ -114,8 +83,6 @@ def write_combo(raw, workdir):
         with open(os.path.join(workdir, "plasma.nix"), "w") as f:
             f.write(main.PLASMA_NIX)
 
-    # a path flake outside a git repo hashes its whole directory and trips the
-    # NAR mismatch that ADR-010 fixed in the installer; do what main.py does
     subprocess.run(["git", "init", "-q"], cwd=workdir, check=True)
     subprocess.run(["git", "add", "-A"], cwd=workdir, check=True)
     return selected

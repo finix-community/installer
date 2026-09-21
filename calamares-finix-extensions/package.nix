@@ -25,14 +25,12 @@ stdenv.mkDerivation (finalAttrs: {
 
   meta = {
     description = "Calamares modules for finix (fork of calamares-nixos-extensions)";
-    homepage = "https://github.com/NixOS/calamares-nixos-extensions";
+    homepage = "https://github.com/finix-community/installer";
     license = with lib.licenses; [
       mit
-      # assets
       cc-by-40
       cc-by-sa-40
     ];
-    maintainers = with lib.maintainers; [ vlinkz ];
     platforms = lib.platforms.linux;
   };
 })
