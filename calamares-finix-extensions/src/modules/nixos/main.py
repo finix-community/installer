@@ -115,8 +115,8 @@ NOCTALIA_REV = "3d7b9869950592ff7cf3704f6a53afb169d850db"
 NVWM_REV = "58bfe34f14d532b6fdcac3149133cccd2e3bf653"
 VXWM_REV = "8b9f04c415a96c92fc36b7639cd1877903f3f0eb"
 NEWM_REV = "d120fcc390eba70593aecfafbafefe8647fd5c92"
-GLUEWC_REV = "0e602ca06e35e6d4f535a077dd89b15c4fdc6f89"
-GLUEQS_REV = "1c787c3fa8ade2d7fe1148c5f76facdb8313053e"
+GLUEWC_REV = "d824fe84c3adf309d5ede657ea3c1a3863bceb3a"
+GLUEQS_REV = "9962580548892ccf7f3e9a2750c77925c6babe09"
 SCENEFX_REV = "37ccd723bef49e6891156ffafce8f549f01446cc"
 
 cfgsessions = {
@@ -1003,7 +1003,7 @@ _GLUEWC_PKGS = """    gluewc
 _GLUEQS_NIX_LET = """  glueqsConfig = pkgs.runCommand "glueqs-config" { nativeBuildInputs = [ pkgs.jq ]; } ''
     cp -r ${inputs.glueqs-src} $out
     chmod -R u+w $out
-    jq '.wallpaper = "@@wallpaper@@" | .dockUsage = ""' ${inputs.glueqs-src}/settings.json > $out/settings.json
+    jq -n '{wallpaper: "@@wallpaper@@", dockUsage: ""}' > $out/settings.json
   '';
 """
 

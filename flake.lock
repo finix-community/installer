@@ -34,34 +34,34 @@
     "glueqs-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1788708441,
-        "narHash": "sha256-U46u92oUPIGIMlg9ELznePy48j8z69XMBb07G74c6wQ=",
+        "lastModified": 1791189844,
+        "narHash": "sha256-22fHKkvL+IEXTkWQfLyRDdDFG/TvwVLc8R1CdppO3YY=",
         "owner": "vladbiber",
         "repo": "glueqs",
-        "rev": "1c787c3fa8ade2d7fe1148c5f76facdb8313053e",
+        "rev": "9962580548892ccf7f3e9a2750c77925c6babe09",
         "type": "github"
       },
       "original": {
         "owner": "vladbiber",
         "repo": "glueqs",
-        "rev": "1c787c3fa8ade2d7fe1148c5f76facdb8313053e",
+        "rev": "9962580548892ccf7f3e9a2750c77925c6babe09",
         "type": "github"
       }
     },
     "gluewc-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1788706568,
-        "narHash": "sha256-BxomToUZnGkcyeM8vDHA161lPaVBrDC2PAjPR5irbCE=",
+        "lastModified": 1791565496,
+        "narHash": "sha256-GazuXpmbz6rj79bg18PRFeVvhj61+TtCun7fwh+Xlpw=",
         "owner": "vladbiber",
         "repo": "gluewc",
-        "rev": "0e602ca06e35e6d4f535a077dd89b15c4fdc6f89",
+        "rev": "d824fe84c3adf309d5ede657ea3c1a3863bceb3a",
         "type": "github"
       },
       "original": {
         "owner": "vladbiber",
         "repo": "gluewc",
-        "rev": "0e602ca06e35e6d4f535a077dd89b15c4fdc6f89",
+        "rev": "d824fe84c3adf309d5ede657ea3c1a3863bceb3a",
         "type": "github"
       }
     },

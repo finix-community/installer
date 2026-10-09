@@ -303,7 +303,7 @@ let
   glueqsConfig = pkgs.runCommand "glueqs-config" { nativeBuildInputs = [ pkgs.jq ]; } ''
     cp -r ${inputs.glueqs-src} $out
     chmod -R u+w $out
-    jq '.wallpaper = "/etc/finix/wallpaper.png" | .dockUsage = ""' ${inputs.glueqs-src}/settings.json > $out/settings.json
+    jq -n '{wallpaper: "/etc/finix/wallpaper.png", dockUsage: ""}' > $out/settings.json
   '';
 
   session-gluewc-glueqs = pkgs.writeShellScript "session-gluewc-glueqs" ''

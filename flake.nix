@@ -19,11 +19,11 @@
       flake = false;
     };
     gluewc-src = {
-      url = "github:vladbiber/gluewc/0e602ca06e35e6d4f535a077dd89b15c4fdc6f89";
+      url = "github:vladbiber/gluewc/d824fe84c3adf309d5ede657ea3c1a3863bceb3a";
       flake = false;
     };
     glueqs-src = {
-      url = "github:vladbiber/glueqs/1c787c3fa8ade2d7fe1148c5f76facdb8313053e";
+      url = "github:vladbiber/glueqs/9962580548892ccf7f3e9a2750c77925c6babe09";
       flake = false;
     };
     scenefx-src = {
