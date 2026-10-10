@@ -18,7 +18,7 @@ Pre-built image on the Internet Archive:
 
 ```sh
 sha256sum finix-graphical-install.iso
-# 67d603a5d5af94cbdc8d3d9c503640064a53826096dfbd70b6096b3a27aa83ce
+# 26c03d87941979e25b74995b33375cb89c3bdb6998d996cece648c132dd0fcea
 ```
 
 ## What you get
